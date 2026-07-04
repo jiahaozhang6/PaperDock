@@ -6,9 +6,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$HostName = "com.arxivmate.local"
-$SourceScript = Join-Path $PSScriptRoot "arxivmate-native-host.js"
-$SourceLauncher = Join-Path $PSScriptRoot "arxivmate-native-host.cmd"
+$HostName = "com.paperdock.local"
+$SourceScript = Join-Path $PSScriptRoot "paperdock-native-host.js"
+$SourceLauncher = Join-Path $PSScriptRoot "paperdock-native-host.cmd"
 if (-not (Test-Path -LiteralPath $SourceScript)) {
   throw "Native host script not found: $SourceScript"
 }
@@ -16,16 +16,16 @@ if (-not (Test-Path -LiteralPath $SourceLauncher)) {
   throw "Native host launcher not found: $SourceLauncher"
 }
 
-$InstallDir = Join-Path $env:LOCALAPPDATA "arXivMate\native-host"
+$InstallDir = Join-Path $env:LOCALAPPDATA "PaperDock\native-host"
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-Copy-Item -LiteralPath $SourceScript -Destination (Join-Path $InstallDir "arxivmate-native-host.js") -Force
-Copy-Item -LiteralPath $SourceLauncher -Destination (Join-Path $InstallDir "arxivmate-native-host.cmd") -Force
+Copy-Item -LiteralPath $SourceScript -Destination (Join-Path $InstallDir "paperdock-native-host.js") -Force
+Copy-Item -LiteralPath $SourceLauncher -Destination (Join-Path $InstallDir "paperdock-native-host.cmd") -Force
 
 $ManifestPath = Join-Path $InstallDir "$HostName.json"
-$HostScript = Join-Path $InstallDir "arxivmate-native-host.cmd"
+$HostScript = Join-Path $InstallDir "paperdock-native-host.cmd"
 $Manifest = [ordered]@{
   name = $HostName
-  description = "arXivMate local Codex/Claude config reader"
+  description = "PaperDock local Codex/Claude config reader"
   path = $HostScript
   type = "stdio"
   allowed_origins = @("chrome-extension://$ExtensionId/")

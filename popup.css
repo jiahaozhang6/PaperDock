@@ -79,25 +79,25 @@ p {
   display: none;
 }
 
-.am-update-title {
+.pd-update-title {
   display: block;
   margin-bottom: 3px;
   color: var(--accent);
   font-size: 13px;
 }
 
-.am-update-text {
+.pd-update-text {
   margin: 0;
   font-size: 12px;
 }
 
-.am-update-actions {
+.pd-update-actions {
   display: grid;
   gap: 6px;
 }
 
-.am-update-download,
-.am-update-guide {
+.pd-update-download,
+.pd-update-guide {
   min-height: 32px;
   display: inline-flex;
   align-items: center;
@@ -114,7 +114,7 @@ p {
   cursor: pointer;
 }
 
-.am-update-guide {
+.pd-update-guide {
   background: var(--control);
   color: var(--accent);
 }

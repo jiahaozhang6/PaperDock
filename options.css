@@ -152,28 +152,28 @@ body[data-appearance="sepia"] {
   display: none;
 }
 
-.am-update-title {
+.pd-update-title {
   display: block;
   margin-bottom: 4px;
   color: var(--accent-strong);
   font-size: 14px;
 }
 
-.am-update-text {
+.pd-update-text {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
 }
 
-.am-update-actions {
+.pd-update-actions {
   flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.am-update-download,
-.am-update-guide {
+.pd-update-download,
+.pd-update-guide {
   min-height: 34px;
   display: inline-flex;
   align-items: center;
@@ -189,7 +189,7 @@ body[data-appearance="sepia"] {
   text-decoration: none;
 }
 
-.am-update-guide {
+.pd-update-guide {
   background: var(--control);
   color: var(--accent);
 }
@@ -1216,7 +1216,7 @@ ul {
   }
 
   .update-banner,
-  .am-update-actions {
+  .pd-update-actions {
     flex-direction: column;
     align-items: stretch;
   }

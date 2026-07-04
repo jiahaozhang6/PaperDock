@@ -1,4 +1,4 @@
-window.ArxivMateMath = (() => {
+window.PaperDockMath = (() => {
   const PLACEHOLDER_PREFIX = "\uE000AMATH";
   const PLACEHOLDER_SUFFIX = "\uE001";
   const DISPLAY_ENVIRONMENTS = new Set([
@@ -193,13 +193,13 @@ window.ArxivMateMath = (() => {
           output: "htmlAndMathml",
           macros: KATEX_MACROS
         });
-        return `<span class="am-math ${display ? "am-math-display" : "am-math-inline"}">${rendered}</span>`;
+        return `<span class="pd-math ${display ? "pd-math-display" : "pd-math-inline"}">${rendered}</span>`;
       } catch (_error) {
-        return `<span class="am-math am-math-error ${display ? "am-math-display" : "am-math-inline"}">${escapeHtml(source)}</span>`;
+        return `<span class="pd-math pd-math-error ${display ? "pd-math-display" : "pd-math-inline"}">${escapeHtml(source)}</span>`;
       }
     }
 
-    return `<span class="am-math ${display ? "am-math-display" : "am-math-inline"}">${renderExpression(source)}</span>`;
+    return `<span class="pd-math ${display ? "pd-math-display" : "pd-math-inline"}">${renderExpression(source)}</span>`;
   }
 
   function splitFencedSections(markdown) {
@@ -642,7 +642,7 @@ window.ArxivMateMath = (() => {
       const bottom = top ? readNextGroup(tex, top.next) : null;
       if (top && bottom) {
         return {
-          html: `<span class="am-math-frac"><span>${renderExpression(top.value)}</span><span>${renderExpression(bottom.value)}</span></span>`,
+          html: `<span class="pd-math-frac"><span>${renderExpression(top.value)}</span><span>${renderExpression(bottom.value)}</span></span>`,
           next: bottom.next
         };
       }
@@ -651,7 +651,7 @@ window.ArxivMateMath = (() => {
       const group = readNextGroup(tex, end);
       if (group) {
         return {
-          html: `<span class="am-math-root"><span>&radic;</span><span>${renderExpression(group.value)}</span></span>`,
+          html: `<span class="pd-math-root"><span>&radic;</span><span>${renderExpression(group.value)}</span></span>`,
           next: group.next
         };
       }
@@ -659,7 +659,7 @@ window.ArxivMateMath = (() => {
     if (FONT_COMMANDS.has(name)) {
       const group = readNextGroup(tex, end);
       if (group) {
-        const className = `am-math-${name.toLowerCase()}`;
+        const className = `pd-math-${name.toLowerCase()}`;
         return {
           html: `<span class="${className}">${renderExpression(group.value)}</span>`,
           next: group.next

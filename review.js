@@ -11,7 +11,7 @@ const statTurnsNode = document.querySelector("#stat-turns");
 const statSubjectsNode = document.querySelector("#stat-subjects");
 const statSavedNode = document.querySelector("#stat-saved");
 const updateBannerNode = document.querySelector("#update-banner");
-const I18N = window.ArxivMateI18n;
+const I18N = window.PaperDockI18n;
 
 let notes = [];
 let filteredNotes = [];
@@ -52,7 +52,7 @@ function applyLanguage() {
 }
 
 function renderUpdateBanner() {
-  window.ArxivMateUpdateBanner?.checkAndRender({
+  window.PaperDockUpdateBanner?.checkAndRender({
     container: updateBannerNode,
     language: currentLanguage
   });
@@ -308,7 +308,7 @@ async function exportMarkdown(items) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `arxivmate-notes-${new Date().toISOString().slice(0, 10)}.md`;
+  link.download = `paperdock-notes-${new Date().toISOString().slice(0, 10)}.md`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -490,8 +490,8 @@ function formatTokenCount(value) {
 }
 
 function markdownToHtml(markdown) {
-  if (window.ArxivMateMarkdown?.toHtml) {
-    return window.ArxivMateMarkdown.toHtml(markdown, { headingOffset: 2 });
+  if (window.PaperDockMarkdown?.toHtml) {
+    return window.PaperDockMarkdown.toHtml(markdown, { headingOffset: 2 });
   }
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   const html = [];

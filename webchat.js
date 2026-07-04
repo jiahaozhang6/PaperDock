@@ -221,7 +221,7 @@
   const submitResults = new Map();
 
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.data?.source !== "arxivmate-webchat") return;
+    if (event.source !== window || event.data?.source !== "paperdock-webchat") return;
     if (event.data.type === "ARXIVMATE_WEBCHAT_STREAM_START") {
       sseDone = false;
       sseDoneAt = 0;
@@ -722,7 +722,7 @@
     const requestId = `${Date.now()}-${++promptRequestSerial}`;
     promptWriteResults.delete(requestId);
     window.postMessage({
-      source: "arxivmate-webchat",
+      source: "paperdock-webchat",
       type: `ARXIVMATE_WEBCHAT_SET_PROMPT_V${BRIDGE_VERSION}`,
       bridgeVersion: BRIDGE_VERSION,
       requestId,
@@ -748,7 +748,7 @@
     const requestId = `${Date.now()}-${++promptRequestSerial}`;
     submitResults.delete(requestId);
     window.postMessage({
-      source: "arxivmate-webchat",
+      source: "paperdock-webchat",
       type: `ARXIVMATE_WEBCHAT_SUBMIT_V${BRIDGE_VERSION}`,
       bridgeVersion: BRIDGE_VERSION,
       requestId
@@ -804,7 +804,7 @@
         resolve(Boolean(ok));
       });
       window.postMessage({
-        source: "arxivmate-webchat",
+        source: "paperdock-webchat",
         type: `ARXIVMATE_WEBCHAT_NETWORK_HEALTH_REQUEST_V${BRIDGE_VERSION}`,
         bridgeVersion: BRIDGE_VERSION,
         requestId
@@ -816,7 +816,7 @@
     if (networkHookActive && mainWorldInjected) return true;
     const ok = await requestMainWorldHealth();
     if (ok) return true;
-    throw new Error("WebChat MAIN-world 网络桥接未就绪，无法确认 DeepSeek/ChatGPT 是否真的发送。请在 chrome://extensions 重新加载 arXivMate，并刷新 WebChat 页面后重试。");
+    throw new Error("WebChat MAIN-world 网络桥接未就绪，无法确认 DeepSeek/ChatGPT 是否真的发送。请在 chrome://extensions 重新加载 PaperDock，并刷新 WebChat 页面后重试。");
   }
 
   function findObservedRequestContext(baselineSerial, prompt = "") {
@@ -1024,7 +1024,7 @@
       if (await waitForAttachmentAccepted(site, baseline, 15000, file.name)) return true;
     }
 
-    throw new Error(`${site.label} 页面没有被 arXivMate 识别为已接收本次 PDF 附件（${file.name}）。若页面中已经出现 PDF 卡片，请刷新 WebChat 页面后重试；诊断：${JSON.stringify({
+    throw new Error(`${site.label} 页面没有被 PaperDock 识别为已接收本次 PDF 附件（${file.name}）。若页面中已经出现 PDF 卡片，请刷新 WebChat 页面后重试；诊断：${JSON.stringify({
       attachmentState: getAttachmentState(site, file.name),
       selectedFileInput: selectedInputDiagnostic,
       fileInputs: getFileInputDiagnostics(site)
@@ -2902,7 +2902,7 @@
 
   async function runWebChat(port, payload, state) {
     const site = currentSite();
-    if (!site) throw new Error("当前页面不是 arXivMate 支持的 WebChat 页面。");
+    if (!site) throw new Error("当前页面不是 PaperDock 支持的 WebChat 页面。");
 
     const prompt = String(payload.prompt || "").trim();
     if (!prompt) throw new Error("WebChat prompt 为空。");
@@ -3226,7 +3226,7 @@
   });
 
   chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== `arxivmate-webchat-v${BRIDGE_VERSION}`) return;
+    if (port.name !== `paperdock-webchat-v${BRIDGE_VERSION}`) return;
     const state = {
       cancelled: false,
       completed: false,

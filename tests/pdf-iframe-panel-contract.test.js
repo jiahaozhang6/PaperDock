@@ -20,19 +20,19 @@ assert.doesNotMatch(
 
 assert.match(
   content,
-  /<label class="alc-model-picker">[\s\S]*?<select class="alc-model-select"/,
+  /<label class="pd-model-picker">[\s\S]*?<select class="pd-model-select"/,
   "model picker should use the stable native select markup"
 );
 
 assert.doesNotMatch(
   content,
-  /alc-model-combobox|alc-model-button|alc-model-menu|renderModelMenu|toggleModelMenu/,
+  /pd-model-combobox|pd-model-button|pd-model-menu|renderModelMenu|toggleModelMenu/,
   "content should not keep the later custom model combobox"
 );
 
 assert.doesNotMatch(
   css,
-  /alc-model-combobox|alc-model-button|alc-model-menu|is-pdf-panel/,
+  /pd-model-combobox|pd-model-button|pd-model-menu|is-pdf-panel/,
   "CSS should not hide the native model select or style the removed custom combobox"
 );
 

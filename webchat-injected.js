@@ -18,7 +18,7 @@
   function post(payload) {
     try {
       window.postMessage({
-        source: "arxivmate-webchat",
+        source: "paperdock-webchat",
         ...payload
       }, "*");
     } catch {}
@@ -748,7 +748,7 @@
   }
 
   window.addEventListener("message", (event) => {
-    if (event.source !== window || event.data?.source !== "arxivmate-webchat") return;
+    if (event.source !== window || event.data?.source !== "paperdock-webchat") return;
     const requestId = event.data.requestId || "";
     if (event.data.type === `ARXIVMATE_WEBCHAT_NETWORK_HEALTH_REQUEST_V${PATCH_VERSION}` && Number(event.data.bridgeVersion) === PATCH_VERSION) {
       post({

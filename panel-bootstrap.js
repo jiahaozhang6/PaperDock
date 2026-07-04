@@ -18,9 +18,9 @@
       showPanelBootstrapError("没有拿到当前论文信息。请回到论文/PDF 页面，点击扩展图标里的“打开当前页面板”。");
       return;
     }
-    window.ArxivMateEmbeddedPanelMode = true;
+    window.PaperDockEmbeddedPanelMode = true;
     if (paper) {
-      window.ArxivMateEmbeddedPanelPaper = paper;
+      window.PaperDockEmbeddedPanelPaper = paper;
     }
     await loadScript(CONTENT_SCRIPT);
     setTimeout(() => {
@@ -81,25 +81,25 @@
   }
 
   function isPanelMounted() {
-    const root = document.getElementById("arxiv-llm-companion-root");
-    const panel = root?.shadowRoot?.querySelector(".alc-panel");
+    const root = document.getElementById("paperdock-companion-root");
+    const panel = root?.shadowRoot?.querySelector(".pd-panel");
     return Boolean(panel?.classList.contains("is-open") && panel.classList.contains("is-embedded"));
   }
 
   function showPanelBootstrapError(message) {
     const fallback = ensurePanelFallback();
     fallback.innerHTML = `
-      <strong>arXivMate 面板没有成功加载</strong>
+      <strong>PaperDock 面板没有成功加载</strong>
       <span>${escapeHtml(message || "未知错误")}</span>
-      <small>请在扩展管理页重新加载 arXivMate，然后回到论文/PDF 页面重新打开面板。</small>
+      <small>请在扩展管理页重新加载 PaperDock，然后回到论文/PDF 页面重新打开面板。</small>
     `;
   }
 
   function ensurePanelFallback() {
-    let fallback = document.getElementById("arxivmate-panel-static-fallback");
+    let fallback = document.getElementById("paperdock-panel-static-fallback");
     if (fallback) return fallback;
     fallback = document.createElement("div");
-    fallback.id = "arxivmate-panel-static-fallback";
+    fallback.id = "paperdock-panel-static-fallback";
     fallback.className = "panel-static-fallback";
     document.body.appendChild(fallback);
     return fallback;

@@ -52,8 +52,8 @@ const context = {
   window: {
     matchMedia: () => ({ matches: false }),
     open() {},
-    ArxivMateUpdateBanner: { checkAndRender() {}, renderResult() {} },
-    ArxivMateI18n: {
+    PaperDockUpdateBanner: { checkAndRender() {}, renderResult() {} },
+    PaperDockI18n: {
       normalizeLanguage: (value) => value || "system",
       resolveLanguage: () => "en",
       t: (language, key, vars = {}) => `${key}${vars.count ? `:${vars.count}` : ""}`

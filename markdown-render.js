@@ -1,27 +1,27 @@
-window.ArxivMateMarkdown = (() => {
+window.PaperDockMarkdown = (() => {
   let renderer = null;
 
   function toHtml(markdown, options = {}) {
-    const source = window.ArxivMateMath?.normalizeLooseMath
-      ? window.ArxivMateMath.normalizeLooseMath(String(markdown || ""))
+    const source = window.PaperDockMath?.normalizeLooseMath
+      ? window.PaperDockMath.normalizeLooseMath(String(markdown || ""))
       : String(markdown || "");
-    const math = window.ArxivMateMath?.extractMath
-      ? window.ArxivMateMath.extractMath(source)
+    const math = window.PaperDockMath?.extractMath
+      ? window.PaperDockMath.extractMath(source)
       : { text: source, segments: [] };
     const md = getRenderer();
 
     if (!md) {
       const fallback = fallbackToHtml(math.text, options);
-      return window.ArxivMateMath?.restoreMath
-        ? window.ArxivMateMath.restoreMath(fallback, math.segments)
+      return window.PaperDockMath?.restoreMath
+        ? window.PaperDockMath.restoreMath(fallback, math.segments)
         : fallback;
     }
 
     const html = md.render(math.text, {
       headingOffset: Number.isFinite(options.headingOffset) ? options.headingOffset : 0
     });
-    return window.ArxivMateMath?.restoreMath
-      ? window.ArxivMateMath.restoreMath(html, math.segments)
+    return window.PaperDockMath?.restoreMath
+      ? window.PaperDockMath.restoreMath(html, math.segments)
       : html;
   }
 
@@ -61,7 +61,7 @@ window.ArxivMateMarkdown = (() => {
   }
 
   function installSectionBreaks(md) {
-    md.renderer.rules.hr = () => '<hr class="am-section-break">';
+    md.renderer.rules.hr = () => '<hr class="pd-section-break">';
   }
 
   function installLinkAttributes(md) {
@@ -81,7 +81,7 @@ window.ArxivMateMarkdown = (() => {
     const defaultRender = md.renderer.rules.image || renderToken;
     md.renderer.rules.image = (tokens, index, options, env, self) => {
       const token = tokens[index];
-      token.attrJoin("class", "am-markdown-image");
+      token.attrJoin("class", "pd-markdown-image");
       token.attrSet("loading", "lazy");
       token.attrSet("decoding", "async");
       return defaultRender(tokens, index, options, env, self);
@@ -89,12 +89,12 @@ window.ArxivMateMarkdown = (() => {
   }
 
   function installTableWrapper(md) {
-    md.renderer.rules.table_open = () => '<div class="am-table-wrap"><table>';
+    md.renderer.rules.table_open = () => '<div class="pd-table-wrap"><table>';
     md.renderer.rules.table_close = () => "</table></div>";
   }
 
   function installTaskLists(md) {
-    md.core.ruler.after("inline", "arxivmate_task_lists", (state) => {
+    md.core.ruler.after("inline", "paperdock_task_lists", (state) => {
       const tokens = state.tokens;
       for (let index = 0; index < tokens.length; index += 1) {
         const token = tokens[index];
@@ -109,9 +109,9 @@ window.ArxivMateMarkdown = (() => {
 
         first.content = first.content.slice(match[0].length);
         const checkbox = new state.Token("html_inline", "", 0);
-        checkbox.content = `<input class="am-task-checkbox" type="checkbox" disabled ${/[xX]/.test(match[1]) ? "checked " : ""}aria-hidden="true">`;
+        checkbox.content = `<input class="pd-task-checkbox" type="checkbox" disabled ${/[xX]/.test(match[1]) ? "checked " : ""}aria-hidden="true">`;
         token.children.unshift(checkbox);
-        tokens[index - 2].attrJoin("class", "am-task-list-item");
+        tokens[index - 2].attrJoin("class", "pd-task-list-item");
       }
     });
   }
@@ -120,20 +120,20 @@ window.ArxivMateMarkdown = (() => {
     const defaultRender = md.renderer.rules.code_inline || ((tokens, index) =>
       `<code>${escapeHtml(tokens[index].content || "")}</code>`);
     md.renderer.rules.code_inline = (tokens, index, options, env, self) => {
-      const rendered = window.ArxivMateMath?.renderStandaloneMath?.(tokens[index].content || "");
+      const rendered = window.PaperDockMath?.renderStandaloneMath?.(tokens[index].content || "");
       return rendered || defaultRender(tokens, index, options, env, self);
     };
   }
 
   function installThinkingBlocks(md) {
-    md.block.ruler.before("fence", "arxivmate_thinking_block", (state, startLine, endLine, silent) => {
+    md.block.ruler.before("fence", "paperdock_thinking_block", (state, startLine, endLine, silent) => {
       const start = state.bMarks[startLine] + state.tShift[startLine];
       const max = state.eMarks[startLine];
       const marker = state.src.slice(start, max).trim();
-      if (!marker.startsWith(":::arxivmate-thinking")) return false;
+      if (!marker.startsWith(":::paperdock-thinking")) return false;
       if (silent) return true;
 
-      const title = marker.slice(":::arxivmate-thinking".length).trim() || "Thinking";
+      const title = marker.slice(":::paperdock-thinking".length).trim() || "Thinking";
       let nextLine = startLine + 1;
       while (nextLine < endLine) {
         const lineStart = state.bMarks[nextLine] + state.tShift[nextLine];
@@ -143,17 +143,17 @@ window.ArxivMateMarkdown = (() => {
       }
       const content = state.getLines(startLine + 1, nextLine, state.blkIndent, false);
 
-      const open = state.push("arxivmate_thinking_open", "details", 1);
+      const open = state.push("paperdock_thinking_open", "details", 1);
       open.block = true;
       open.info = title;
 
-      const summary = state.push("arxivmate_thinking_summary", "summary", 0);
+      const summary = state.push("paperdock_thinking_summary", "summary", 0);
       summary.block = true;
       summary.content = title;
 
       state.md.block.parse(content, state.md, state.env, state.tokens);
 
-      const close = state.push("arxivmate_thinking_close", "details", -1);
+      const close = state.push("paperdock_thinking_close", "details", -1);
       close.block = true;
       state.line = nextLine < endLine ? nextLine + 1 : nextLine;
       return true;
@@ -161,10 +161,10 @@ window.ArxivMateMarkdown = (() => {
       alt: ["paragraph", "reference", "blockquote", "list"]
     });
 
-    md.renderer.rules.arxivmate_thinking_open = () => '<details class="am-thinking-block">';
-    md.renderer.rules.arxivmate_thinking_summary = (tokens, index) =>
+    md.renderer.rules.paperdock_thinking_open = () => '<details class="pd-thinking-block">';
+    md.renderer.rules.paperdock_thinking_summary = (tokens, index) =>
       `<summary>${escapeHtml(tokens[index].content || "Thinking")}</summary>`;
-    md.renderer.rules.arxivmate_thinking_close = () => "</details>";
+    md.renderer.rules.paperdock_thinking_close = () => "</details>";
   }
 
   function offsetHeadingTag(tag, offset) {
@@ -194,7 +194,7 @@ window.ArxivMateMarkdown = (() => {
     const flushThinking = () => {
       if (!thinking) return;
       flushParagraph();
-      html.push(`<details class="am-thinking-block"><summary>${escapeHtml(thinking.title || "Thinking")}</summary>${fallbackToHtml(thinking.lines.join("\n"), options)}</details>`);
+      html.push(`<details class="pd-thinking-block"><summary>${escapeHtml(thinking.title || "Thinking")}</summary>${fallbackToHtml(thinking.lines.join("\n"), options)}</details>`);
       thinking = null;
     };
 
@@ -209,10 +209,10 @@ window.ArxivMateMarkdown = (() => {
         }
         continue;
       }
-      if (trimmed.startsWith(":::arxivmate-thinking")) {
+      if (trimmed.startsWith(":::paperdock-thinking")) {
         flushParagraph();
         thinking = {
-          title: trimmed.slice(":::arxivmate-thinking".length).trim() || "Thinking",
+          title: trimmed.slice(":::paperdock-thinking".length).trim() || "Thinking",
           lines: []
         };
         continue;

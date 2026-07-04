@@ -1,4 +1,4 @@
-const I18N = window.ArxivMateI18n;
+const I18N = window.PaperDockI18n;
 const statusNode = document.querySelector("#status");
 const updateStatusNode = document.querySelector("#update-status");
 const downloadUpdateLink = document.querySelector("#download-update");
@@ -35,7 +35,7 @@ openPanelButton?.addEventListener("click", () => {
     : openPanelForCurrentTab();
   pending.catch((error) => {
     statusNode.textContent = `${t("popupOpenPanelFailed")} ${error?.message || ""}`.trim();
-    console.warn("arXivMate popup open panel failed:", error);
+    console.warn("PaperDock popup open panel failed:", error);
   });
 });
 
@@ -80,17 +80,17 @@ async function openPanelForTab(tab) {
   if (!tab?.id || !isSupportedPaperTab(tab.url || "")) return;
   statusNode.textContent = t("popupOpeningPanel");
   try {
-    await sendTabMessage(tab.id, { type: "openArxivMatePanel" });
+    await sendTabMessage(tab.id, { type: "openPaperDockPanel" });
     statusNode.textContent = t("popupStatusArxiv");
     return;
   } catch (firstError) {
     try {
       await injectContentScripts(tab.id);
-      await sendTabMessage(tab.id, { type: "openArxivMatePanel" });
+      await sendTabMessage(tab.id, { type: "openPaperDockPanel" });
       statusNode.textContent = t("popupStatusArxiv");
       return;
     } catch (secondError) {
-      console.warn("arXivMate page injection failed:", firstError, secondError);
+      console.warn("PaperDock page injection failed:", firstError, secondError);
       throw new Error(t("popupOpenPanelRetryHint"));
     }
   }
@@ -190,7 +190,7 @@ function renderUpdateBanner() {
   updateStatusNode.classList.remove("is-visible");
   downloadUpdateLink.hidden = true;
   downloadUpdateLink.removeAttribute("href");
-  window.ArxivMateUpdateBanner?.checkAndRender({
+  window.PaperDockUpdateBanner?.checkAndRender({
     container: updateBannerNode,
     language: currentLanguage,
     compact: true

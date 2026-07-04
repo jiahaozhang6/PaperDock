@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="./icons/icon-128.png" width="88" height="88" alt="arXivMate icon">
+  <img src="./icons/icon-128.png" width="88" height="88" alt="PaperDock icon">
 </p>
 
-# arXivMate
+# PaperDock
 
-arXivMate 是一个本地优先的论文阅读浏览器扩展。打开论文或 PDF 后，可以用自己的模型做速览、深读、追问、保存笔记，并把论文保存到 Zotero。
+PaperDock 是一个本地优先的论文阅读浏览器扩展。打开论文或 PDF 后，可以用自己的模型做速览、深读、追问、保存笔记，并把论文保存到 Zotero。
 
 支持 Chrome、Edge 和大多数 Chromium 浏览器。
 
@@ -41,9 +41,9 @@ arXivMate 是一个本地优先的论文阅读浏览器扩展。打开论文或 
 
 推荐下载稳定版：
 
-[Releases](https://github.com/jiahaozhang6/arXivMate/releases)
+[Releases](https://github.com/jiahaozhang6/PaperDock/releases)
 
-1. 下载最新 `arXivMate-vX.X.X.zip`
+1. 下载最新 `PaperDock-vX.X.X.zip`
 2. 解压
 3. 打开 `chrome://extensions` 或 `edge://extensions`
 4. 打开开发者模式
@@ -52,7 +52,7 @@ arXivMate 是一个本地优先的论文阅读浏览器扩展。打开论文或 
 
 ## 使用
 
-1. 打开 arXivMate 设置页
+1. 打开 PaperDock 设置页
 2. 新建模型
 3. 填写 Base URL、API Key、模型名
 4. 测试并保存
@@ -79,7 +79,7 @@ WebChat 模式需要先登录对应网页。
 
 先打开 Zotero Desktop，再在论文面板点击 `Zotero`。
 
-arXivMate 可以读取本地分类，手动选择分类，或让模型推荐分类。保存时会创建 Zotero 条目，并尽量附上 PDF。
+PaperDock 可以读取本地分类，手动选择分类，或让模型推荐分类。保存时会创建 Zotero 条目，并尽量附上 PDF。
 
 ## 升级
 
@@ -95,12 +95,12 @@ ZIP 安装：
 
 1. 下载最新版 ZIP
 2. 用新文件覆盖原文件夹
-3. 在扩展管理页刷新 arXivMate
+3. 在扩展管理页刷新 PaperDock
 4. 刷新已经打开的论文页面
 
 ## 数据
 
-arXivMate 不提供云服务。模型配置、API Key、聊天记录、复盘库和缓存保存在浏览器本地。
+PaperDock 不提供云服务。模型配置、API Key、聊天记录、复盘库和缓存保存在浏览器本地。
 
 请求模型时，论文内容和问题会发送给你选择的模型服务。使用 ChatGPT Web 或 DeepSeek Web 时，内容会发送到对应网页会话。
 
@@ -128,7 +128,7 @@ MIT. See [LICENSE](./LICENSE).
 
 ## English
 
-arXivMate is a local-first Chromium extension for reading research papers with your own LLMs.
+PaperDock is a local-first Chromium extension for reading research papers with your own LLMs.
 
 It supports arXiv, ACM, IEEE, regular PDFs, local PDFs, ChatGPT Web, DeepSeek Web, and local Zotero.
 
@@ -140,6 +140,6 @@ Main features:
 - save notes locally
 - save papers to Zotero collections
 
-Install from [Releases](https://github.com/jiahaozhang6/arXivMate/releases), unzip, then load the folder from `chrome://extensions` or `edge://extensions`.
+Install from [Releases](https://github.com/jiahaozhang6/PaperDock/releases), unzip, then load the folder from `chrome://extensions` or `edge://extensions`.
 
 Do not uninstall before upgrading, or browser-local data may be removed.

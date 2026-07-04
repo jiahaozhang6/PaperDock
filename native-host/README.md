@@ -1,6 +1,6 @@
-# arXivMate Native Helper
+# PaperDock Native Helper
 
-Chrome/Edge extensions cannot silently read arbitrary local files. This helper lets arXivMate read local Codex/Claude config paths such as:
+Chrome/Edge extensions cannot silently read arbitrary local files. This helper lets PaperDock read local Codex/Claude config paths such as:
 
 - `~/.codex/config.toml`
 - `~/.codex/auth.json`

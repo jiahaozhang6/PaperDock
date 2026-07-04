@@ -1,4 +1,4 @@
-window.ArxivMateUpdateBanner = (() => {
+window.PaperDockUpdateBanner = (() => {
   function checkAndRender({ container, language = "system", compact = false } = {}) {
     if (!container) return Promise.resolve(null);
     return sendMessage({ type: "checkForUpdate", force: false })
@@ -29,31 +29,31 @@ window.ArxivMateUpdateBanner = (() => {
     container.replaceChildren();
 
     const body = document.createElement("div");
-    body.className = "am-update-body";
+    body.className = "pd-update-body";
 
     const title = document.createElement("strong");
-    title.className = "am-update-title";
+    title.className = "pd-update-title";
     title.textContent = t(language, "updateBannerTitle", {
       version: result.latestVersion,
       tag: result.latestTag
     });
 
     const text = document.createElement("p");
-    text.className = "am-update-text";
+    text.className = "pd-update-text";
     text.textContent = t(language, "updateBannerBody");
 
     const actions = document.createElement("div");
-    actions.className = "am-update-actions";
+    actions.className = "pd-update-actions";
 
     const download = document.createElement("a");
-    download.className = "am-update-download";
+    download.className = "pd-update-download";
     download.href = result.latestZipUrl;
     download.target = "_blank";
     download.rel = "noreferrer";
     download.textContent = t(language, "downloadLatestStable");
 
     const guide = document.createElement("button");
-    guide.className = "am-update-guide";
+    guide.className = "pd-update-guide";
     guide.type = "button";
     guide.textContent = t(language, "viewUpgradeGuide");
     guide.addEventListener("click", openOptionsPage);
@@ -107,7 +107,7 @@ window.ArxivMateUpdateBanner = (() => {
   }
 
   function t(language, key, vars = {}) {
-    const i18n = window.ArxivMateI18n;
+    const i18n = window.PaperDockI18n;
     return i18n?.t ? i18n.t(language, key, vars) : key;
   }
 

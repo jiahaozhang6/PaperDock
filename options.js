@@ -23,7 +23,7 @@ const importLocalModelFilesInput = document.querySelector("#import-local-model-f
 const localModelPathsInput = document.querySelector("#local-model-paths");
 const localModelImportResultNode = document.querySelector("#local-model-import-result");
 const saveUiPreferencesButton = document.querySelector("#save-ui-preferences");
-const I18N = window.ArxivMateI18n;
+const I18N = window.PaperDockI18n;
 
 const DEFAULT_LOCAL_MODEL_CONFIG_PATHS = [
   "~/.codex/config.toml",
@@ -1940,14 +1940,14 @@ function applyLanguage(value) {
 
 function renderGlobalUpdateBanner(result) {
   if (result) {
-    window.ArxivMateUpdateBanner?.renderResult({
+    window.PaperDockUpdateBanner?.renderResult({
       container: globalUpdateBannerNode,
       result,
       language: currentLanguage
     });
     return;
   }
-  window.ArxivMateUpdateBanner?.checkAndRender({
+  window.PaperDockUpdateBanner?.checkAndRender({
     container: globalUpdateBannerNode,
     language: currentLanguage
   });
@@ -1987,7 +1987,7 @@ async function exportBackup() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `arxivmate-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `paperdock-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -2074,7 +2074,7 @@ function renderUpdateActions(result) {
   }
 
   downloadUpdateLink.href = result.latestZipUrl;
-  openReleaseLink.href = result.releaseUrl || result.sourceUrl || "https://github.com/jiahaozhang6/arXivMate/releases";
+  openReleaseLink.href = result.releaseUrl || result.sourceUrl || "https://github.com/jiahaozhang6/PaperDock/releases";
   updateStepsNode.innerHTML = `
     <strong>${escapeHtml(t("gitUpgradeTitle"))}</strong>
     <ol>
@@ -2082,7 +2082,7 @@ function renderUpdateActions(result) {
       <li>${escapeHtml(t("gitUpgradeStep2"))}</li>
       <li>${escapeHtml(t("gitUpgradeStep3"))}</li>
     </ol>
-    <pre><code>cd arXivMate
+    <pre><code>cd PaperDock
 git pull</code></pre>
     <strong>${escapeHtml(t("zipUpgradeTitle"))}</strong>
     <ol>

@@ -26,15 +26,15 @@ const MAX_MESSAGES_PER_CONVERSATION = 200;
 const MAX_CONTEXT_CACHE_ENTRIES = 80;
 const PDF_TEXT_MIN_CHARS = 1600;
 const PDF_TEXT_CONTEXT_SOURCE = "PDF 文本抽取（未上传 PDF 文件）+ 页面元数据";
-const GITHUB_RELEASES_API_URL = "https://api.github.com/repos/jiahaozhang6/arXivMate/releases";
-const GITHUB_RELEASES_PAGE_URL = "https://github.com/jiahaozhang6/arXivMate/releases";
+const GITHUB_RELEASES_API_URL = "https://api.github.com/repos/jiahaozhang6/PaperDock/releases";
+const GITHUB_RELEASES_PAGE_URL = "https://github.com/jiahaozhang6/PaperDock/releases";
 const UPDATE_CHECK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const SETTINGS_LOCAL_KEY = "settings";
 const SETTINGS_MIRROR_KEY = "settingsMirror";
 const MODEL_PROFILES_LOCAL_KEY = "modelProfiles";
-const BACKUP_FORMAT = "arXivMate.localData";
+const BACKUP_FORMAT = "PaperDock.localData";
 const BACKUP_VERSION = 1;
-const NATIVE_LOCAL_HOST_NAME = "com.arxivmate.local";
+const NATIVE_LOCAL_HOST_NAME = "com.paperdock.local";
 const MAX_LOCAL_CONFIG_BYTES = 1024 * 1024;
 const DEFAULT_LOCAL_MODEL_CONFIG_PATHS = [
   "~/.codex/config.toml",
@@ -120,7 +120,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   try {
     await chrome.storage.sync.set({ settings: persisted });
   } catch (error) {
-    console.warn("arXivMate settings sync copy failed:", error);
+    console.warn("PaperDock settings sync copy failed:", error);
   }
 });
 
@@ -135,7 +135,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name !== "alc-stream") return;
+  if (port.name !== "pd-stream") return;
   const controller = new AbortController();
   port.onDisconnect.addListener(() => controller.abort());
   port.onMessage.addListener((message) => {
@@ -594,7 +594,7 @@ async function checkForUpdate({ force = false } = {}) {
       checkedAt: new Date(now).toISOString(),
       sourceUrl: release.html_url || GITHUB_RELEASES_PAGE_URL,
       releaseUrl: release.html_url || GITHUB_RELEASES_PAGE_URL,
-      repositoryUrl: "https://github.com/jiahaozhang6/arXivMate",
+      repositoryUrl: "https://github.com/jiahaozhang6/PaperDock",
       error: ""
     };
     await chrome.storage.local.set({ updateCheck: result });
@@ -609,7 +609,7 @@ async function checkForUpdate({ force = false } = {}) {
       checkedAt: updateCheck?.checkedAt || "",
       sourceUrl: updateCheck?.sourceUrl || GITHUB_RELEASES_PAGE_URL,
       releaseUrl: updateCheck?.releaseUrl || updateCheck?.sourceUrl || GITHUB_RELEASES_PAGE_URL,
-      repositoryUrl: "https://github.com/jiahaozhang6/arXivMate",
+      repositoryUrl: "https://github.com/jiahaozhang6/PaperDock",
       error: error.message || String(error)
     };
     return fallback;
@@ -709,7 +709,7 @@ async function mirrorSettingsToSync(persisted) {
     );
     return "";
   } catch (error) {
-    console.warn("arXivMate settings sync copy failed:", error);
+    console.warn("PaperDock settings sync copy failed:", error);
     return error.message || String(error);
   }
 }
@@ -799,7 +799,7 @@ async function importLocalData(backup) {
   try {
     await chrome.storage.sync.set({ settings: persistedSettings });
   } catch (error) {
-    console.warn("arXivMate backup settings sync copy failed:", error);
+    console.warn("PaperDock backup settings sync copy failed:", error);
   }
   notifyPaperTabsSettingsChanged(persistedSettings);
   return {
@@ -851,7 +851,7 @@ async function notifyPaperTabsSettingsChanged(settings) {
         });
       } catch {
         // Do not reload reading tabs on settings save; pages without the content
-        // script will pick up changes the next time the user opens arXivMate.
+        // script will pick up changes the next time the user opens PaperDock.
       }
     }
   } catch {
@@ -947,7 +947,7 @@ function createCurrentModelListFallback(profile, warning) {
 async function getZoteroTargets() {
   await callZoteroConnector("ping", {});
   const payload = await callZoteroConnector("getSelectedCollection", { switchToReadableLibrary: true });
-  return ArxivMateZotero.normalizeTargetsPayload(payload);
+  return PaperDockZotero.normalizeTargetsPayload(payload);
 }
 
 async function suggestZoteroTargets(paper, targets, profileId = "", selectedTargetId = "") {
@@ -959,7 +959,7 @@ async function suggestZoteroTargets(paper, targets, profileId = "", selectedTarg
   if (isWebChatProvider(settings.provider)) {
     throw new Error("AI 推荐分类需要使用 API 模型；WebChat 模型不适合在后台静默请求。");
   }
-  const prompt = ArxivMateZotero.buildSuggestionPrompt(normalizedPaper, normalizedTargets);
+  const prompt = PaperDockZotero.buildSuggestionPrompt(normalizedPaper, normalizedTargets);
   const text = await callChatCompletions({
     ...settings,
     temperature: 0.1,
@@ -976,7 +976,7 @@ async function suggestZoteroTargets(paper, targets, profileId = "", selectedTarg
   ]);
   const suggestions = parseZoteroSuggestions(text, normalizedTargets);
   return {
-    suggestions: suggestions.length ? suggestions : ArxivMateZotero.createSuggestionFallback(normalizedPaper, normalizedTargets, {
+    suggestions: suggestions.length ? suggestions : PaperDockZotero.createSuggestionFallback(normalizedPaper, normalizedTargets, {
       selectedTargetId
     }),
     raw: text
@@ -984,7 +984,7 @@ async function suggestZoteroTargets(paper, targets, profileId = "", selectedTarg
 }
 
 function parseZoteroSuggestions(text, targets) {
-  return ArxivMateZotero.parseSuggestionResponse(text, targets);
+  return PaperDockZotero.parseSuggestionResponse(text, targets);
 }
 
 async function ensureZoteroCookiePermission(origins = []) {
@@ -1022,8 +1022,8 @@ async function savePaperToZotero({ paper, targetId = "", summary = "", conversat
 
   const ping = await callZoteroConnector("ping", {});
   const supportsAttachmentUpload = ping?.prefs?.supportsAttachmentUpload !== false;
-  const sessionID = `arxivmate-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const itemWithAttachment = ArxivMateZotero.buildZoteroItem(normalizedPaper, { includeAttachment: attachPdf });
+  const sessionID = `paperdock-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const itemWithAttachment = PaperDockZotero.buildZoteroItem(normalizedPaper, { includeAttachment: attachPdf });
   const pdfAttachment = itemWithAttachment.attachments?.[0] || null;
   const itemForSave = supportsAttachmentUpload
     ? { ...itemWithAttachment, attachments: [] }
@@ -1037,7 +1037,7 @@ async function savePaperToZotero({ paper, targetId = "", summary = "", conversat
   };
 
   const savedItems = await callZoteroConnector(endpointMethod(ZOTERO_CONNECTOR_SAVE_ITEMS_ENDPOINT), savePayload);
-  const note = ArxivMateZotero.buildZoteroNoteHtml({
+  const note = PaperDockZotero.buildZoteroNoteHtml({
     paper: normalizedPaper,
     summary,
     conversation,
@@ -1075,7 +1075,7 @@ async function savePaperToZotero({ paper, targetId = "", summary = "", conversat
     target: {
       id: target.id,
       name: target.name,
-      path: ArxivMateZotero.formatZoteroTargetPath(selected.targets, target.id) || target.name
+      path: PaperDockZotero.formatZoteroTargetPath(selected.targets, target.id) || target.name
     },
     items: Array.isArray(savedItems) ? savedItems : [],
     pdf
@@ -1216,10 +1216,10 @@ async function getDetailedCookiesForZotero(urls = []) {
 
 async function callZoteroConnector(method, data = null, options = {}) {
   const query = options.queryString ? `?${options.queryString}` : "";
-  const url = `${ArxivMateZotero.ZOTERO_CONNECTOR_BASE_URL}connector/${method}${query}`;
+  const url = `${PaperDockZotero.ZOTERO_CONNECTOR_BASE_URL}connector/${method}${query}`;
   const headers = {
-    "X-Zotero-Version": ArxivMateZotero.ZOTERO_EXTENSION_VERSION,
-    "X-Zotero-Connector-API-Version": String(ArxivMateZotero.ZOTERO_CONNECTOR_API_VERSION),
+    "X-Zotero-Version": PaperDockZotero.ZOTERO_EXTENSION_VERSION,
+    "X-Zotero-Connector-API-Version": String(PaperDockZotero.ZOTERO_CONNECTOR_API_VERSION),
     ...(options.headers || {})
   };
   let body = null;
@@ -1575,7 +1575,7 @@ async function callWebChatStream(settings, messages, webchatPdf, paper, webchatS
     signal?.addEventListener("abort", abort, { once: true });
 
     try {
-      port = chrome.tabs.connect(tab.id, { name: `arxivmate-webchat-v${WEBCHAT_BRIDGE_VERSION}` });
+      port = chrome.tabs.connect(tab.id, { name: `paperdock-webchat-v${WEBCHAT_BRIDGE_VERSION}` });
     } catch (error) {
       finish(reject, error);
       return;
@@ -1680,12 +1680,12 @@ function formatWebChatFinalText(answer, thinking, settings) {
   const split = splitWebChatThinkingFromAnswer(answer, thinking);
   const cleanAnswer = normalizeTextBlock(split.answer);
   const cleanThinking = normalizeTextBlock(split.thinking);
-  if (/:::arxivmate-thinking\b/.test(cleanAnswer)) return cleanAnswer;
+  if (/:::paperdock-thinking\b/.test(cleanAnswer)) return cleanAnswer;
   if (!cleanThinking || normalizeThinkingMode(settings?.thinkingMode) === "disabled") {
     return cleanAnswer;
   }
   return [
-    `:::arxivmate-thinking ${webChatThinkingSummary(settings)}`,
+    `:::paperdock-thinking ${webChatThinkingSummary(settings)}`,
     cleanThinking,
     ":::",
     "",
@@ -1697,7 +1697,7 @@ function splitWebChatThinkingFromAnswer(answer, thinking = "") {
   const cleanAnswer = normalizeTextBlock(answer);
   const cleanThinking = normalizeTextBlock(thinking);
   if (!cleanAnswer) return { answer: "", thinking: cleanThinking };
-  if (/:::arxivmate-thinking\b/.test(cleanAnswer)) {
+  if (/:::paperdock-thinking\b/.test(cleanAnswer)) {
     return {
       answer: cleanAnswer,
       thinking: ""
@@ -1849,7 +1849,7 @@ async function ensureWebChatBridge(tabId) {
     if (next?.ok && Number(next.bridgeVersion) === WEBCHAT_BRIDGE_VERSION) return next;
     await delay(250);
   }
-  throw new Error("WebChat 桥接脚本未就绪或仍是旧版本。请在 chrome://extensions 重新加载 arXivMate 后，再刷新 ChatGPT/DeepSeek 页面重试。");
+  throw new Error("WebChat 桥接脚本未就绪或仍是旧版本。请在 chrome://extensions 重新加载 PaperDock 后，再刷新 ChatGPT/DeepSeek 页面重试。");
 }
 
 function sendTabMessage(tabId, message) {
@@ -1877,7 +1877,7 @@ function buildWebChatPrompt(messages, settings, options = {}) {
     return buildAttachmentAwareWebChatPrompt(messages, settings, options.paper, options.webchatPdf);
   }
   const chunks = [
-    "You are being used through arXivMate WebChat mode. Follow the original roles and answer the final user request.",
+    "You are being used through PaperDock WebChat mode. Follow the original roles and answer the final user request.",
     `Current WebChat profile: ${settings.requestProfileName || settings.model || providerLabel(settings.provider)}`
   ];
   for (const message of messages || []) {
@@ -1902,8 +1902,8 @@ function buildReusableWebChatPrompt(messages, settings, paper = {}, session = {}
   const cleanedQuestion = stripWebChatFullTextBlocks(finalContent);
   return [
     zh
-      ? "你正在 arXivMate WebChat 模式中继续同一篇论文的网页会话。"
-      : "You are continuing the same paper conversation through arXivMate WebChat mode.",
+      ? "你正在 PaperDock WebChat 模式中继续同一篇论文的网页会话。"
+      : "You are continuing the same paper conversation through PaperDock WebChat mode.",
     zh
       ? "前面这个网页会话已经上传过该论文 PDF；除非我明确要求重新上传，请基于本会话已有 PDF 和历史回答继续。"
       : "The PDF was already uploaded earlier in this web chat. Unless I explicitly request a re-upload, continue using the existing attached PDF and prior chat context.",
@@ -1925,9 +1925,9 @@ function buildReusableWebChatPrompt(messages, settings, paper = {}, session = {}
 
 function buildAttachmentAwareWebChatPrompt(messages, settings, paper = {}, webchatPdf = {}) {
   const chunks = [
-    "You are being used through arXivMate WebChat mode.",
+    "You are being used through PaperDock WebChat mode.",
     webchatPdf?.generated
-      ? "A generated context PDF is attached in this chat. It was generated by arXivMate from readable publisher page text because the original PDF download was blocked."
+      ? "A generated context PDF is attached in this chat. It was generated by PaperDock from readable publisher page text because the original PDF download was blocked."
       : "A PDF file is attached in this chat. Read the attached PDF directly as the primary source.",
     webchatPdf?.generated
       ? "Treat the generated context PDF as extracted paper context. Do not assume it preserves the publisher's original PDF layout."
@@ -3591,7 +3591,7 @@ function normalizePreferredModelProfileId(value, modelProfiles = []) {
 function resolveRequestSettings(settings, profileId) {
   const profiles = Array.isArray(settings?.modelProfiles) ? settings.modelProfiles : [];
   if (!profiles.length) {
-    throw new Error("还没有模型配置。请先打开 arXivMate 设置，新建并测试一个模型。");
+    throw new Error("还没有模型配置。请先打开 PaperDock 设置，新建并测试一个模型。");
   }
   const id = normalizeString(profileId) || normalizeString(settings?.preferredModelProfileId);
   const profile = profiles.find((item) => item.id === id) || profiles[0];
@@ -3756,7 +3756,7 @@ function tagToVersion(tag) {
 
 function buildReleaseZipUrl(tag) {
   const normalized = versionToTag(tag);
-  return normalized ? `https://github.com/jiahaozhang6/arXivMate/archive/refs/tags/${encodeURIComponent(normalized)}.zip` : "";
+  return normalized ? `https://github.com/jiahaozhang6/PaperDock/archive/refs/tags/${encodeURIComponent(normalized)}.zip` : "";
 }
 
 function findLatestStableRelease(releases) {

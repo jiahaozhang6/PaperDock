@@ -1,6 +1,6 @@
 (function () {
   if (!isRuntimeAvailable()) return;
-  const I18N = window.ArxivMateI18n;
+  const I18N = window.PaperDockI18n;
   const PANEL_LAYOUT_STORAGE_KEY = "panelLayout";
   const WEBCHAT_PDF_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
   const embeddedPanelPaper = readEmbeddedPanelPaper();
@@ -17,7 +17,7 @@
         paper = detectedPaper;
         if (!paper.id) paper = ensureDocumentIdentity(paper);
         if (!paper.id && !paper.title) return;
-        removeExistingArxivMateRoots();
+        removeExistingPaperDockRoots();
         installIframePanel(paper);
       })
       .catch(() => {});
@@ -26,8 +26,8 @@
   if (!paper.id) paper = ensureDocumentIdentity(paper);
   if (!paper.id && !paper.title) return;
 
-  removeExistingArxivMateRoots();
-  document.getElementById("arxivmate-panel-static-fallback")?.remove();
+  removeExistingPaperDockRoots();
+  document.getElementById("paperdock-panel-static-fallback")?.remove();
 
   if (!isEmbeddedPanel && isPdfPage()) {
     installIframePanel(paper);
@@ -75,7 +75,7 @@
   };
 
   const host = document.createElement("div");
-  host.id = "arxiv-llm-companion-root";
+  host.id = "paperdock-companion-root";
   host.dataset.extensionId = chrome.runtime.id || "";
   const shadow = host.attachShadow({ mode: "open" });
   document.documentElement.appendChild(host);
@@ -95,123 +95,123 @@
 
   const wrapper = document.createElement("div");
   wrapper.innerHTML = `
-    <button class="alc-fab" type="button" title="arXivMate">AI</button>
-    <section class="alc-panel" aria-label="arXivMate">
-      <header class="alc-header">
-        <div class="alc-title-block">
-          <div class="alc-kicker">arXivMate</div>
+    <button class="pd-fab" type="button" title="PaperDock">AI</button>
+    <section class="pd-panel" aria-label="PaperDock">
+      <header class="pd-header">
+        <div class="pd-title-block">
+          <div class="pd-kicker">PaperDock</div>
           <h2></h2>
-          <div class="alc-meta"></div>
+          <div class="pd-meta"></div>
         </div>
-        <div class="alc-header-actions">
-          <button class="alc-icon-button alc-layout-toggle" type="button" title="浮动窗口" data-i18n-title="floatPanel">⇱</button>
-          <button class="alc-icon-button alc-restore-layout" type="button" title="还原尺寸" data-i18n-title="restorePanel">↺</button>
-          <button class="alc-icon-button alc-close" type="button" title="折叠分屏" data-i18n-title="closeSplit">×</button>
+        <div class="pd-header-actions">
+          <button class="pd-icon-button pd-layout-toggle" type="button" title="浮动窗口" data-i18n-title="floatPanel">⇱</button>
+          <button class="pd-icon-button pd-restore-layout" type="button" title="还原尺寸" data-i18n-title="restorePanel">↺</button>
+          <button class="pd-icon-button pd-close" type="button" title="折叠分屏" data-i18n-title="closeSplit">×</button>
         </div>
       </header>
 
-      <div class="alc-toolbar">
-        <div class="alc-shortcuts">
+      <div class="pd-toolbar">
+        <div class="pd-shortcuts">
           <button data-mode="quick" type="button" data-i18n="quick">速览</button>
           <button data-mode="deep" type="button" data-i18n="deep">深读</button>
           <button data-mode="study" type="button" data-i18n="study">学习卡</button>
         </div>
-        <div class="alc-tools">
-          <label class="alc-model-picker">
+        <div class="pd-tools">
+          <label class="pd-model-picker">
             <span data-i18n="chatModel">模型</span>
-            <select class="alc-model-select" title="切换当前聊天模型" data-i18n-title="switchChatModel"></select>
+            <select class="pd-model-select" title="切换当前聊天模型" data-i18n-title="switchChatModel"></select>
           </label>
-          <label class="alc-toggle" title="聊天会优先抽取 PDF/正文全文；arXiv 页面失败时可再尝试 ar5iv，速度会慢一些" data-i18n-title="fullTextTitle">
-            <input class="alc-fulltext" type="checkbox" checked disabled>
+          <label class="pd-toggle" title="聊天会优先抽取 PDF/正文全文；arXiv 页面失败时可再尝试 ar5iv，速度会慢一些" data-i18n-title="fullTextTitle">
+            <input class="pd-fulltext" type="checkbox" checked disabled>
             <span data-i18n="fullText">全文</span>
           </label>
-          <button class="alc-copy" type="button" title="复制 Markdown" data-i18n="copy" data-i18n-title="copyMarkdown">复制</button>
-          <button class="alc-save" type="button" title="保存最后一条回答" data-i18n="save" data-i18n-title="saveLastAnswer">保存</button>
-          <button class="alc-zotero" type="button" title="保存到 Zotero" data-i18n="zotero" data-i18n-title="zoteroTitle">Zotero</button>
-          <button class="alc-review" type="button" title="打开复盘库" data-i18n="history" data-i18n-title="openReview">历史</button>
-          <button class="alc-clear-chat" type="button" title="清空本篇对话" data-i18n="clear" data-i18n-title="clearChat">清空</button>
-          <button class="alc-options" type="button" title="设置" data-i18n="settings" data-i18n-title="settings">设置</button>
+          <button class="pd-copy" type="button" title="复制 Markdown" data-i18n="copy" data-i18n-title="copyMarkdown">复制</button>
+          <button class="pd-save" type="button" title="保存最后一条回答" data-i18n="save" data-i18n-title="saveLastAnswer">保存</button>
+          <button class="pd-zotero" type="button" title="保存到 Zotero" data-i18n="zotero" data-i18n-title="zoteroTitle">Zotero</button>
+          <button class="pd-review" type="button" title="打开复盘库" data-i18n="history" data-i18n-title="openReview">历史</button>
+          <button class="pd-clear-chat" type="button" title="清空本篇对话" data-i18n="clear" data-i18n-title="clearChat">清空</button>
+          <button class="pd-options" type="button" title="设置" data-i18n="settings" data-i18n-title="settings">设置</button>
         </div>
       </div>
 
-      <div class="alc-chat-shell">
-        <div class="alc-update-banner" hidden></div>
-        <div class="alc-chat" role="log" aria-live="polite"></div>
+      <div class="pd-chat-shell">
+        <div class="pd-update-banner" hidden></div>
+        <div class="pd-chat" role="log" aria-live="polite"></div>
       </div>
 
-      <aside class="alc-zotero-drawer" hidden>
-        <header class="alc-zotero-head">
+      <aside class="pd-zotero-drawer" hidden>
+        <header class="pd-zotero-head">
           <div>
             <strong data-i18n="zoteroTitle">保存到 Zotero</strong>
-            <span class="alc-zotero-subtitle alc-zotero-status">选择分类，也可以让模型推荐。</span>
+            <span class="pd-zotero-subtitle pd-zotero-status">选择分类，也可以让模型推荐。</span>
           </div>
-          <button class="alc-zotero-close" type="button" title="关闭" data-i18n-title="collapse">×</button>
+          <button class="pd-zotero-close" type="button" title="关闭" data-i18n-title="collapse">×</button>
         </header>
-        <div class="alc-zotero-current">
+        <div class="pd-zotero-current">
           <span data-i18n="zoteroCurrentTarget">保存到</span>
-          <strong class="alc-zotero-current-path" data-i18n="zoteroNoTargets">没有读取到可用分类。请确认 Zotero Desktop 已打开。</strong>
-          <button class="alc-zotero-primary alc-zotero-save" type="button" data-i18n="zoteroSave">保存到 Zotero</button>
+          <strong class="pd-zotero-current-path" data-i18n="zoteroNoTargets">没有读取到可用分类。请确认 Zotero Desktop 已打开。</strong>
+          <button class="pd-zotero-primary pd-zotero-save" type="button" data-i18n="zoteroSave">保存到 Zotero</button>
         </div>
-        <div class="alc-zotero-actions">
-          <button class="alc-zotero-load" type="button" data-i18n="zoteroLoadTargets">读取分类</button>
-          <button class="alc-zotero-suggest" type="button" data-i18n="zoteroSuggest">AI 推荐</button>
+        <div class="pd-zotero-actions">
+          <button class="pd-zotero-load" type="button" data-i18n="zoteroLoadTargets">读取分类</button>
+          <button class="pd-zotero-suggest" type="button" data-i18n="zoteroSuggest">AI 推荐</button>
         </div>
-        <div class="alc-zotero-expanded">
-          <label class="alc-zotero-search">
-            <input class="alc-zotero-filter" type="search" placeholder="搜索 Zotero 分类..." data-i18n-placeholder="zoteroSearchPlaceholder">
+        <div class="pd-zotero-expanded">
+          <label class="pd-zotero-search">
+            <input class="pd-zotero-filter" type="search" placeholder="搜索 Zotero 分类..." data-i18n-placeholder="zoteroSearchPlaceholder">
           </label>
-          <div class="alc-zotero-library">
-            <div class="alc-zotero-suggestions"></div>
-            <div class="alc-zotero-library-title" data-i18n="zoteroAllCollections">全部分类</div>
-            <div class="alc-zotero-targets" role="listbox"></div>
+          <div class="pd-zotero-library">
+            <div class="pd-zotero-suggestions"></div>
+            <div class="pd-zotero-library-title" data-i18n="zoteroAllCollections">全部分类</div>
+            <div class="pd-zotero-targets" role="listbox"></div>
           </div>
-          <textarea class="alc-zotero-note" rows="2" placeholder="Add a note" data-i18n-placeholder="zoteroNotePlaceholder"></textarea>
-          <input class="alc-zotero-tags" type="text" placeholder="Tags, separated by commas" data-i18n-placeholder="zoteroTagsPlaceholder">
+          <textarea class="pd-zotero-note" rows="2" placeholder="Add a note" data-i18n-placeholder="zoteroNotePlaceholder"></textarea>
+          <input class="pd-zotero-tags" type="text" placeholder="Tags, separated by commas" data-i18n-placeholder="zoteroTagsPlaceholder">
         </div>
       </aside>
 
-      <footer class="alc-composer">
+      <footer class="pd-composer">
         <textarea rows="1" placeholder="问这篇论文：方法假设、实验设计、局限、和你的方向有什么关系..." data-i18n-placeholder="askPlaceholder"></textarea>
-        <div class="alc-history-jump" title="快速翻阅当前对话" data-i18n-title="historyJump">
-          <button class="alc-history-prev" type="button" title="上一条历史对话" data-i18n-title="historyPrev">↑</button>
-          <button class="alc-history-next" type="button" title="下一条历史对话" data-i18n-title="historyNext">↓</button>
+        <div class="pd-history-jump" title="快速翻阅当前对话" data-i18n-title="historyJump">
+          <button class="pd-history-prev" type="button" title="上一条历史对话" data-i18n-title="historyPrev">↑</button>
+          <button class="pd-history-next" type="button" title="下一条历史对话" data-i18n-title="historyNext">↓</button>
         </div>
-        <button class="alc-send" data-mode="ask" type="button" data-i18n="send">发送</button>
+        <button class="pd-send" data-mode="ask" type="button" data-i18n="send">发送</button>
       </footer>
-      <div class="alc-status" role="status"></div>
-      <div class="alc-resize-edge" title="拖拽调整面板宽度" data-i18n-title="resizePanel" aria-hidden="true"></div>
-      <div class="alc-resize-corner" title="拖拽调整浮动窗口大小" data-i18n-title="resizeFloatingPanel" aria-hidden="true"></div>
+      <div class="pd-status" role="status"></div>
+      <div class="pd-resize-edge" title="拖拽调整面板宽度" data-i18n-title="resizePanel" aria-hidden="true"></div>
+      <div class="pd-resize-corner" title="拖拽调整浮动窗口大小" data-i18n-title="resizeFloatingPanel" aria-hidden="true"></div>
     </section>
   `;
   shadow.appendChild(wrapper);
 
   const $ = (selector) => shadow.querySelector(selector);
-  const fab = $(".alc-fab");
-  const panel = $(".alc-panel");
-  const panelHeader = $(".alc-header");
+  const fab = $(".pd-fab");
+  const panel = $(".pd-panel");
+  const panelHeader = $(".pd-header");
   const title = $("h2");
-  const meta = $(".alc-meta");
-  const input = $(".alc-composer textarea");
-  const status = $(".alc-status");
-  const chat = $(".alc-chat");
-  const updateBanner = $(".alc-update-banner");
-  const fullTextToggle = $(".alc-fulltext");
-  const modelSelect = $(".alc-model-select");
-  const sendButton = $(".alc-send");
-  const historyPrevButton = $(".alc-history-prev");
-  const historyNextButton = $(".alc-history-next");
-  const layoutToggleButton = $(".alc-layout-toggle");
-  const restoreLayoutButton = $(".alc-restore-layout");
-  const resizeEdge = $(".alc-resize-edge");
-  const resizeCorner = $(".alc-resize-corner");
-  const zoteroDrawer = $(".alc-zotero-drawer");
-  const zoteroStatus = $(".alc-zotero-status");
-  const zoteroTargets = $(".alc-zotero-targets");
-  const zoteroSuggestions = $(".alc-zotero-suggestions");
-  const zoteroFilter = $(".alc-zotero-filter");
-  const zoteroNote = $(".alc-zotero-note");
-  const zoteroTags = $(".alc-zotero-tags");
-  const zoteroCurrentPath = $(".alc-zotero-current-path");
+  const meta = $(".pd-meta");
+  const input = $(".pd-composer textarea");
+  const status = $(".pd-status");
+  const chat = $(".pd-chat");
+  const updateBanner = $(".pd-update-banner");
+  const fullTextToggle = $(".pd-fulltext");
+  const modelSelect = $(".pd-model-select");
+  const sendButton = $(".pd-send");
+  const historyPrevButton = $(".pd-history-prev");
+  const historyNextButton = $(".pd-history-next");
+  const layoutToggleButton = $(".pd-layout-toggle");
+  const restoreLayoutButton = $(".pd-restore-layout");
+  const resizeEdge = $(".pd-resize-edge");
+  const resizeCorner = $(".pd-resize-corner");
+  const zoteroDrawer = $(".pd-zotero-drawer");
+  const zoteroStatus = $(".pd-zotero-status");
+  const zoteroTargets = $(".pd-zotero-targets");
+  const zoteroSuggestions = $(".pd-zotero-suggestions");
+  const zoteroFilter = $(".pd-zotero-filter");
+  const zoteroNote = $(".pd-zotero-note");
+  const zoteroTags = $(".pd-zotero-tags");
+  const zoteroCurrentPath = $(".pd-zotero-current-path");
   fullTextToggle.checked = true;
   fullTextToggle.disabled = true;
   chat.addEventListener("scroll", updateConversationAutoScrollFromScroll, { passive: true });
@@ -230,27 +230,27 @@
   } else {
     installFabOpenHandlers();
   }
-  onClick(".alc-close", () => {
+  onClick(".pd-close", () => {
     if (isEmbeddedPanel) {
-      parent.postMessage({ type: "alc-close-panel" }, "*");
+      parent.postMessage({ type: "pd-close-panel" }, "*");
       return;
     }
     togglePanel(false);
   });
-  onClick(".alc-options", () => safeSendRuntimeMessage({ type: "openOptions" }));
-  onClick(".alc-review", () => safeSendRuntimeMessage({ type: "openReview" }));
-  onClick(".alc-copy", copyCurrentMarkdown);
-  onClick(".alc-save", saveCurrentNote);
-  onClick(".alc-zotero", openZoteroDrawer);
-  onClick(".alc-zotero-close", closeZoteroDrawer);
-  onClick(".alc-zotero-load", loadZoteroTargets);
-  onClick(".alc-zotero-suggest", suggestZoteroTargets);
-  onClick(".alc-zotero-save", saveToZotero);
-  onClick(".alc-clear-chat", clearCurrentConversation);
-  onClick(".alc-history-prev", () => jumpConversationMessage(-1));
-  onClick(".alc-history-next", () => jumpConversationMessage(1));
-  onClick(".alc-layout-toggle", togglePanelLayoutMode);
-  onClick(".alc-restore-layout", restorePanelLayout);
+  onClick(".pd-options", () => safeSendRuntimeMessage({ type: "openOptions" }));
+  onClick(".pd-review", () => safeSendRuntimeMessage({ type: "openReview" }));
+  onClick(".pd-copy", copyCurrentMarkdown);
+  onClick(".pd-save", saveCurrentNote);
+  onClick(".pd-zotero", openZoteroDrawer);
+  onClick(".pd-zotero-close", closeZoteroDrawer);
+  onClick(".pd-zotero-load", loadZoteroTargets);
+  onClick(".pd-zotero-suggest", suggestZoteroTargets);
+  onClick(".pd-zotero-save", saveToZotero);
+  onClick(".pd-clear-chat", clearCurrentConversation);
+  onClick(".pd-history-prev", () => jumpConversationMessage(-1));
+  onClick(".pd-history-next", () => jumpConversationMessage(1));
+  onClick(".pd-layout-toggle", togglePanelLayoutMode);
+  onClick(".pd-restore-layout", restorePanelLayout);
   modelSelect.addEventListener("change", switchChatModel);
   ["pointerdown", "mousedown", "click", "focus", "keydown"].forEach((type) => {
     modelSelect.addEventListener(type, markModelSelectInteraction, { capture: true });
@@ -266,26 +266,26 @@
     zoteroState.tags = zoteroTags.value;
   });
   zoteroTargets?.addEventListener("click", (event) => {
-    const toggle = event.target?.closest?.(".alc-zotero-tree-toggle");
+    const toggle = event.target?.closest?.(".pd-zotero-tree-toggle");
     if (toggle) {
       event.preventDefault();
       event.stopPropagation();
       toggleZoteroTreeNode(toggle.dataset.targetId || "");
       return;
     }
-    const button = event.target?.closest?.(".alc-zotero-target");
+    const button = event.target?.closest?.(".pd-zotero-target");
     if (!button) return;
     if (button.getAttribute("aria-disabled") === "true") return;
     zoteroState.selectedTargetId = button.dataset.targetId || "";
     renderZoteroDrawer();
   });
   zoteroTargets?.addEventListener("pointerover", (event) => {
-    const row = event.target?.closest?.(".alc-zotero-target");
+    const row = event.target?.closest?.(".pd-zotero-target");
     if (!row) return;
     expandZoteroTargetOnHover(row.dataset.targetId || "");
   });
   zoteroTargets?.addEventListener("pointerout", (event) => {
-    const row = event.target?.closest?.(".alc-zotero-target");
+    const row = event.target?.closest?.(".pd-zotero-target");
     if (!row) return;
     collapseZoteroTargetOnLeave(row.dataset.targetId || "", event);
   });
@@ -301,7 +301,7 @@
 
   shadow.querySelectorAll("[data-mode]").forEach((button) => {
     button.addEventListener("click", () => {
-      if (button.classList.contains("alc-send") && isGenerating) {
+      if (button.classList.contains("pd-send") && isGenerating) {
         stopCurrentGeneration();
         return;
       }
@@ -399,14 +399,14 @@
     if (isEmbeddedPanel) return;
     panelLayout = normalizePanelLayout(panelLayout);
     const width = panelLayout.dockWidth;
-    document.documentElement.style.setProperty("--alc-split-width", `${width}px`);
-    document.documentElement.classList.toggle("alc-page-split-active", Boolean(open && panelLayout.mode !== "float"));
+    document.documentElement.style.setProperty("--pd-split-width", `${width}px`);
+    document.documentElement.classList.toggle("pd-page-split-active", Boolean(open && panelLayout.mode !== "float"));
   }
 
   async function loadPanelLayout() {
     panelLayout = getDefaultPanelLayout();
     if (isEmbeddedPanel) {
-      parent.postMessage({ type: "alc-request-layout" }, "*");
+      parent.postMessage({ type: "pd-request-layout" }, "*");
       applyEmbeddedPanelLayout();
       return;
     }
@@ -426,7 +426,7 @@
     if (!isEmbeddedPanel) return;
     window.addEventListener("message", (event) => {
       if (event.source !== parent) return;
-      if (event.data?.type !== "alc-panel-layout") return;
+      if (event.data?.type !== "pd-panel-layout") return;
       embeddedLayoutMode = event.data.layout?.mode === "float" ? "float" : "dock";
       applyEmbeddedPanelLayout();
     });
@@ -434,7 +434,7 @@
 
   function togglePanelLayoutMode() {
     if (isEmbeddedPanel) {
-      parent.postMessage({ type: "alc-toggle-layout" }, "*");
+      parent.postMessage({ type: "pd-toggle-layout" }, "*");
       return;
     }
     panelLayout = normalizePanelLayout({
@@ -446,7 +446,7 @@
 
   function restorePanelLayout() {
     if (isEmbeddedPanel) {
-      parent.postMessage({ type: "alc-restore-layout" }, "*");
+      parent.postMessage({ type: "pd-restore-layout" }, "*");
       return;
     }
     panelLayout = getDefaultPanelLayout();
@@ -461,11 +461,11 @@
     panelLayout = normalizePanelLayout(panelLayout);
     const floating = panelLayout.mode === "float";
     panel.classList.toggle("is-floating", floating);
-    panel.style.setProperty("--alc-split-width", `${panelLayout.dockWidth}px`);
-    panel.style.setProperty("--alc-float-width", `${panelLayout.floatWidth}px`);
-    panel.style.setProperty("--alc-float-height", `${panelLayout.floatHeight}px`);
-    panel.style.setProperty("--alc-float-top", `${panelLayout.floatTop}px`);
-    panel.style.setProperty("--alc-float-right", `${panelLayout.floatRight}px`);
+    panel.style.setProperty("--pd-split-width", `${panelLayout.dockWidth}px`);
+    panel.style.setProperty("--pd-float-width", `${panelLayout.floatWidth}px`);
+    panel.style.setProperty("--pd-float-height", `${panelLayout.floatHeight}px`);
+    panel.style.setProperty("--pd-float-top", `${panelLayout.floatTop}px`);
+    panel.style.setProperty("--pd-float-right", `${panelLayout.floatRight}px`);
     applyPageSplit(isPanelOpen);
     updateLayoutButtons(floating);
     if (shouldSave) savePanelLayout();
@@ -505,13 +505,13 @@
     if (event.button !== 0) return;
     event.preventDefault();
     if (isEmbeddedPanel) {
-      const kind = panel.classList.contains("is-floating") || event.currentTarget?.classList.contains("alc-resize-corner")
+      const kind = panel.classList.contains("is-floating") || event.currentTarget?.classList.contains("pd-resize-corner")
         ? "corner"
         : "edge";
-      postEmbeddedPointerGesture(event, "alc-resize", { kind });
+      postEmbeddedPointerGesture(event, "pd-resize", { kind });
       return;
     }
-    const floating = panelLayout.mode === "float" || event.currentTarget?.classList.contains("alc-resize-corner");
+    const floating = panelLayout.mode === "float" || event.currentTarget?.classList.contains("pd-resize-corner");
     const start = {
       x: event.clientX,
       y: event.clientY,
@@ -554,7 +554,7 @@
     if (!panel.classList.contains("is-floating")) return;
     event.preventDefault();
     if (isEmbeddedPanel) {
-      postEmbeddedPointerGesture(event, "alc-drag");
+      postEmbeddedPointerGesture(event, "pd-drag");
       return;
     }
     const start = {
@@ -614,10 +614,10 @@
     document.addEventListener("pointercancel", onUp, true);
   }
 
-  function removeExistingArxivMateRoots() {
-    document.getElementById("arxiv-llm-companion-root")?.remove();
-    document.getElementById("arxiv-llm-companion-frame-root")?.remove();
-    document.documentElement.classList.remove("alc-page-split-active");
+  function removeExistingPaperDockRoots() {
+    document.getElementById("paperdock-companion-root")?.remove();
+    document.getElementById("paperdock-companion-frame-root")?.remove();
+    document.documentElement.classList.remove("pd-page-split-active");
   }
 
   function renderPaperHeader() {
@@ -960,9 +960,9 @@
     zoteroDrawer.hidden = !zoteroState.open;
     zoteroStatus.textContent = zoteroState.status || "";
     zoteroStatus.classList.toggle("is-error", /^error:/i.test(zoteroState.status));
-    const loadButton = $(".alc-zotero-load");
-    const suggestButton = $(".alc-zotero-suggest");
-    const saveButton = $(".alc-zotero-save");
+    const loadButton = $(".pd-zotero-load");
+    const suggestButton = $(".pd-zotero-suggest");
+    const saveButton = $(".pd-zotero-save");
     if (loadButton) loadButton.disabled = zoteroState.loading;
     if (suggestButton) suggestButton.disabled = zoteroState.loading || zoteroState.suggesting || !zoteroState.targets.length;
     if (saveButton) saveButton.disabled = zoteroState.loading || zoteroState.saving || !zoteroState.selectedTargetId;
@@ -1013,7 +1013,7 @@
       filter: zoteroState.filter
     });
     if (!rows.length) {
-      zoteroTargets.innerHTML = `<div class="alc-zotero-empty">${escapeHtml(t("zoteroNoTargets"))}</div>`;
+      zoteroTargets.innerHTML = `<div class="pd-zotero-empty">${escapeHtml(t("zoteroNoTargets"))}</div>`;
       return;
     }
     zoteroTargets.innerHTML = rows.slice(0, 180).map((target) => {
@@ -1024,7 +1024,7 @@
       const expanded = target.isExpanded === true;
       const expandedAttr = target.hasChildren ? `aria-expanded="${expanded ? "true" : "false"}"` : "";
       return `
-        <div class="alc-zotero-target${selected ? " is-selected" : ""}${isLibrary ? " is-library" : ""}${target.hasChildren ? " has-children" : ""}"
+        <div class="pd-zotero-target${selected ? " is-selected" : ""}${isLibrary ? " is-library" : ""}${target.hasChildren ? " has-children" : ""}"
              data-target-id="${escapeHtml(target.id)}"
              data-has-children="${target.hasChildren ? "true" : "false"}"
              style="--level:${Math.min(5, Number(target.level) || 0)}"
@@ -1032,15 +1032,15 @@
              aria-disabled="${disabled ? "true" : "false"}"
              aria-selected="${selected ? "true" : "false"}"
              ${expandedAttr}>
-          <button class="alc-zotero-tree-toggle"
+          <button class="pd-zotero-tree-toggle"
                   type="button"
                   data-target-id="${escapeHtml(target.id)}"
                   aria-label="${expanded ? "Collapse collection" : "Expand collection"}"
                   ${target.hasChildren ? "" : "hidden"}>${expanded ? "▾" : "▸"}</button>
-          <span class="alc-zotero-target-text">
-            <span class="alc-zotero-target-name">${escapeHtml(target.name)}</span>
+          <span class="pd-zotero-target-text">
+            <span class="pd-zotero-target-name">${escapeHtml(target.name)}</span>
           </span>
-          ${isLibrary ? "" : `<span class="alc-zotero-target-path">${escapeHtml(path)}</span>`}
+          ${isLibrary ? "" : `<span class="pd-zotero-target-path">${escapeHtml(path)}</span>`}
         </div>
       `;
     }).join("");
@@ -1061,7 +1061,7 @@
   function scheduleCollapseZoteroHoverBranches(event) {
     if (!zoteroState.hoverExpandedTargetIds.length) return;
     if (zoteroHoverCollapseTimer) clearTimeout(zoteroHoverCollapseTimer);
-    const relatedRow = event?.relatedTarget?.closest?.(".alc-zotero-target");
+    const relatedRow = event?.relatedTarget?.closest?.(".pd-zotero-target");
     const point = Number.isFinite(event?.clientX) && Number.isFinite(event?.clientY)
       ? { x: event.clientX, y: event.clientY }
       : null;
@@ -1104,9 +1104,9 @@
       return;
     }
     zoteroSuggestions.innerHTML = `
-      <div class="alc-zotero-suggestion-title">${escapeHtml(t("zoteroSuggestedTargets"))}</div>
+      <div class="pd-zotero-suggestion-title">${escapeHtml(t("zoteroSuggestedTargets"))}</div>
       ${rows.map((row) => `
-        <button class="alc-zotero-suggestion" type="button" data-target-id="${escapeHtml(row.targetId)}">
+        <button class="pd-zotero-suggestion" type="button" data-target-id="${escapeHtml(row.targetId)}">
           <strong>${escapeHtml(row.path || row.name || row.targetId)}</strong>
           <span>${escapeHtml(row.reason || t("zoteroSuggestedReason"))}</span>
         </button>
@@ -1153,7 +1153,7 @@
   }
 
   function createLocalZoteroSuggestionFallback() {
-    return window.ArxivMateZotero?.createSuggestionFallback?.(paper, zoteroState.targets, {
+    return window.PaperDockZotero?.createSuggestionFallback?.(paper, zoteroState.targets, {
       selectedTargetId: zoteroState.selectedTargetId
     }) || [];
   }
@@ -1280,14 +1280,14 @@
   }
 
   function getZoteroTargetPath(targetId) {
-    return window.ArxivMateZotero?.formatZoteroTargetPath?.(zoteroState.targets, targetId) ||
+    return window.PaperDockZotero?.formatZoteroTargetPath?.(zoteroState.targets, targetId) ||
       formatZoteroTargetPathFallback(zoteroState.targets, targetId) ||
       zoteroState.targets.find((target) => target.id === targetId)?.name ||
       "";
   }
 
   function buildZoteroTargetTreeRows(targets = [], options = {}) {
-    const sharedRows = window.ArxivMateZotero?.buildZoteroTargetTreeRows?.(targets, options);
+    const sharedRows = window.PaperDockZotero?.buildZoteroTargetTreeRows?.(targets, options);
     return Array.isArray(sharedRows) ? sharedRows : buildZoteroTargetTreeRowsFallback(targets, options);
   }
 
@@ -1342,20 +1342,20 @@
   }
 
   function getExpandedZoteroAncestorIds(targets, targetId) {
-    return window.ArxivMateZotero?.getZoteroTargetAncestorIds?.(targets, targetId)
+    return window.PaperDockZotero?.getZoteroTargetAncestorIds?.(targets, targetId)
       ?.filter((id) => !String(id).startsWith("L")) ||
       getZoteroTargetAncestorIdsFallback(targets, targetId).filter((id) => !String(id).startsWith("L")) ||
       [];
   }
 
   function isZoteroTargetInBranch(branchId, targetId) {
-    return window.ArxivMateZotero?.isZoteroTargetInBranch?.(zoteroState.targets, branchId, targetId) ||
+    return window.PaperDockZotero?.isZoteroTargetInBranch?.(zoteroState.targets, branchId, targetId) ||
       branchId === targetId ||
       getZoteroTargetAncestorIdsFallback(zoteroState.targets, targetId).includes(branchId);
   }
 
   function pruneZoteroHoverExpandedTargetIds(pointerTargetId) {
-    const sharedIds = window.ArxivMateZotero?.pruneZoteroHoverExpandedTargetIds?.(
+    const sharedIds = window.PaperDockZotero?.pruneZoteroHoverExpandedTargetIds?.(
       zoteroState.targets,
       zoteroState.hoverExpandedTargetIds,
       pointerTargetId
@@ -1373,7 +1373,7 @@
   function getZoteroTargetRowAtPoint(point) {
     if (!point) return null;
     const element = shadow.elementFromPoint?.(point.x, point.y);
-    return element?.closest?.(".alc-zotero-target") || null;
+    return element?.closest?.(".pd-zotero-target") || null;
   }
 
   function findZoteroTarget(targetId) {
@@ -1613,7 +1613,7 @@
       : "";
     const body = normalizeTextBlock(extractedText);
     return normalizeTextBlock([
-      "arXivMate generated this PDF because the original PDF source was unavailable for direct upload.",
+      "PaperDock generated this PDF because the original PDF source was unavailable for direct upload.",
       "PDF source was unavailable for direct upload. This context PDF is generated from readable page text, PDF viewer text, metadata, and preparation diagnostics.",
       "Use this attached file as the readable paper context for the current question.",
       metadata,
@@ -2042,7 +2042,7 @@
 
   function requestParentPdfText(maxChars) {
     if (!isEmbeddedPanel || window.parent === window) return Promise.resolve(null);
-    const requestId = `alc-pdf-text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const requestId = `pd-pdf-text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve) => {
       const timeout = setTimeout(() => {
         window.removeEventListener("message", onMessage);
@@ -2050,7 +2050,7 @@
       }, 2500);
       const onMessage = (event) => {
         if (event.source !== window.parent) return;
-        if (event.data?.type !== "alc-parent-pdf-text-result" || event.data.requestId !== requestId) return;
+        if (event.data?.type !== "pd-parent-pdf-text-result" || event.data.requestId !== requestId) return;
         clearTimeout(timeout);
         window.removeEventListener("message", onMessage);
         resolve(event.data.extraction || null);
@@ -2058,7 +2058,7 @@
       window.addEventListener("message", onMessage);
       try {
         window.parent.postMessage({
-          type: "alc-extract-parent-pdf-text",
+          type: "pd-extract-parent-pdf-text",
           requestId,
           maxChars
         }, "*");
@@ -2186,7 +2186,7 @@
   function isPdfViewerUiLine(line) {
     const text = String(line || "").trim();
     if (!text) return true;
-    if (/^(arXivMate|AI|PDF|模型|全文|复制|保存|历史|清空|设置|发送|停止)$/i.test(text)) return true;
+    if (/^(PaperDock|AI|PDF|模型|全文|复制|保存|历史|清空|设置|发送|停止)$/i.test(text)) return true;
     if (/^\d+\s*\/\s*\d+$/.test(text)) return true;
     if (/^(zoom|download|print|page|fit|rotate|menu|thumbnail|outline|attachment)$/i.test(text)) return true;
     if (/^(正在生成|正在抽取|上下文|完成|已停止)/.test(text)) return true;
@@ -2222,7 +2222,7 @@
     }
     try {
       chrome.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
-        if (message?.type === "openArxivMatePanel") {
+        if (message?.type === "openPaperDockPanel") {
           togglePanel(true);
           sendResponse?.({ ok: true });
           return false;
@@ -2307,7 +2307,7 @@
   }
 
   function renderUpdateBanner() {
-    window.ArxivMateUpdateBanner?.checkAndRender({
+    window.PaperDockUpdateBanner?.checkAndRender({
       container: updateBanner,
       language: currentLanguage,
       compact: true
@@ -2788,7 +2788,7 @@
     if (!messages.length) {
       historyJumpIndex = -1;
       chat.innerHTML = `
-        <div class="alc-welcome">
+        <div class="pd-welcome">
           <strong>${escapeHtml(t("welcomeTitle"))}</strong>
           <p>${escapeHtml(t("welcomeBody"))}</p>
         </div>
@@ -2798,10 +2798,10 @@
     }
 
     chat.innerHTML = messages.map((message, index) => `
-      <article class="alc-message alc-message-${message.role}${message.streaming ? " is-streaming" : ""}" data-message-index="${index}" data-message-role="${escapeHtml(message.role || "")}">
-        <div class="alc-bubble">
-          <div class="alc-message-meta">${message.role === "user" ? escapeHtml(t("you")) : "AI"} · ${formatTime(message.createdAt, currentLanguage)}${message.mode ? ` · ${escapeHtml(modeLabel(message.mode, currentLanguage))}` : ""}${message.stopped ? ` · ${escapeHtml(t("stoppedBadge"))}` : ""}${message.role === "assistant" ? formatMessageUsageMeta(message, currentLanguage) : ""}</div>
-          <div class="alc-message-body">${message.role === "assistant" ? markdownToHtml(message.text || "") : escapeHtml(message.text || "")}</div>
+      <article class="pd-message pd-message-${message.role}${message.streaming ? " is-streaming" : ""}" data-message-index="${index}" data-message-role="${escapeHtml(message.role || "")}">
+        <div class="pd-bubble">
+          <div class="pd-message-meta">${message.role === "user" ? escapeHtml(t("you")) : "AI"} · ${formatTime(message.createdAt, currentLanguage)}${message.mode ? ` · ${escapeHtml(modeLabel(message.mode, currentLanguage))}` : ""}${message.stopped ? ` · ${escapeHtml(t("stoppedBadge"))}` : ""}${message.role === "assistant" ? formatMessageUsageMeta(message, currentLanguage) : ""}</div>
+          <div class="pd-message-body">${message.role === "assistant" ? markdownToHtml(message.text || "") : escapeHtml(message.text || "")}</div>
         </div>
       </article>
     `).join("");
@@ -2816,7 +2816,7 @@
   }
 
   function getConversationMessageNodes() {
-    return Array.from(chat.querySelectorAll(".alc-message[data-message-index]"));
+    return Array.from(chat.querySelectorAll(".pd-message[data-message-index]"));
   }
 
   function updateHistoryJumpButtons(count = getConversationMessageNodes().length) {
@@ -2920,16 +2920,16 @@
   function setBusy(isBusy) {
     isGenerating = Boolean(isBusy);
     shadow.querySelectorAll("button, textarea, input, select").forEach((node) => {
-      if (node.classList.contains("alc-close") || node.classList.contains("alc-fab")) return;
-      if (node.classList.contains("alc-layout-toggle") || node.classList.contains("alc-restore-layout")) return;
-      if (node.classList.contains("alc-history-prev") || node.classList.contains("alc-history-next")) return;
-      if (node.classList.contains("alc-fulltext")) {
+      if (node.classList.contains("pd-close") || node.classList.contains("pd-fab")) return;
+      if (node.classList.contains("pd-layout-toggle") || node.classList.contains("pd-restore-layout")) return;
+      if (node.classList.contains("pd-history-prev") || node.classList.contains("pd-history-next")) return;
+      if (node.classList.contains("pd-fulltext")) {
         node.disabled = true;
         node.checked = true;
         return;
       }
-      if (node.classList.contains("alc-review") || node.classList.contains("alc-copy")) return;
-      if (node.classList.contains("alc-send")) {
+      if (node.classList.contains("pd-review") || node.classList.contains("pd-copy")) return;
+      if (node.classList.contains("pd-send")) {
         node.disabled = false;
         node.textContent = isBusy ? t("stop") : t("send");
         node.classList.toggle("is-stop", isBusy);
@@ -2956,7 +2956,7 @@
   function notifyEmbeddedPanelReady() {
     if (!isEmbeddedPanel || window.parent === window) return;
     try {
-      window.parent.postMessage({ type: "alc-panel-ready" }, "*");
+      window.parent.postMessage({ type: "pd-panel-ready" }, "*");
     } catch {
       // The outer PDF host may already be gone after navigation.
     }
@@ -3078,7 +3078,7 @@
       };
       try {
         if (!isRuntimeAvailable()) throw createExtensionContextError();
-        port = chrome.runtime.connect({ name: "alc-stream" });
+        port = chrome.runtime.connect({ name: "pd-stream" });
         activeStreamCancel = abort;
       } catch (error) {
         if (isExtensionContextInvalidated(error)) {
@@ -3186,18 +3186,18 @@
 
   function installIframePanel(paperData) {
     if (!isRuntimeAvailable()) return;
-    removeExistingArxivMateRoots();
+    removeExistingPaperDockRoots();
     installPageSplitStyles();
 
     const root = document.createElement("div");
-    root.id = "arxiv-llm-companion-frame-root";
+    root.id = "paperdock-companion-frame-root";
     root.dataset.extensionId = chrome.runtime.id || "";
     const shadowRoot = root.attachShadow({ mode: "open" });
     document.documentElement.appendChild(root);
 
     const styleNode = document.createElement("style");
     styleNode.textContent = `
-      .alc-frame-fab {
+      .pd-frame-fab {
         position: fixed;
         right: 22px;
         bottom: 24px;
@@ -3212,56 +3212,56 @@
         box-shadow: 0 12px 28px rgba(15, 83, 107, 0.26);
         cursor: pointer;
       }
-      .alc-frame {
-        --alc-frame-panel: #fff;
-        --alc-frame-line: #d9e0e6;
-        --alc-frame-shadow: -8px 0 24px rgba(31, 35, 40, 0.16);
+      .pd-frame {
+        --pd-frame-panel: #fff;
+        --pd-frame-line: #d9e0e6;
+        --pd-frame-shadow: -8px 0 24px rgba(31, 35, 40, 0.16);
         position: fixed;
         top: 0;
         right: 0;
         bottom: 0;
         z-index: 2147483647;
-        width: var(--alc-split-width, 460px);
+        width: var(--pd-split-width, 460px);
         display: none;
         overflow: hidden;
-        border-left: 1px solid var(--alc-frame-line);
+        border-left: 1px solid var(--pd-frame-line);
         border-radius: 0;
-        background: var(--alc-frame-panel);
-        box-shadow: var(--alc-frame-shadow);
+        background: var(--pd-frame-panel);
+        box-shadow: var(--pd-frame-shadow);
       }
-      .alc-frame.is-floating {
-        top: var(--alc-float-top, 72px);
-        right: var(--alc-float-right, 24px);
+      .pd-frame.is-floating {
+        top: var(--pd-float-top, 72px);
+        right: var(--pd-float-right, 24px);
         bottom: auto;
-        width: var(--alc-float-width, 560px);
-        height: var(--alc-float-height, 720px);
+        width: var(--pd-float-width, 560px);
+        height: var(--pd-float-height, 720px);
         max-width: calc(100vw - 24px);
         max-height: calc(100vh - 24px);
-        border: 1px solid var(--alc-frame-line);
+        border: 1px solid var(--pd-frame-line);
         border-radius: 8px;
         box-shadow: 0 16px 42px rgba(31, 35, 40, 0.22);
       }
-      :host([data-appearance="dark"]) .alc-frame {
-        --alc-frame-panel: #161a1f;
-        --alc-frame-line: #303942;
-        --alc-frame-shadow: -8px 0 24px rgba(0, 0, 0, 0.32);
+      :host([data-appearance="dark"]) .pd-frame {
+        --pd-frame-panel: #161a1f;
+        --pd-frame-line: #303942;
+        --pd-frame-shadow: -8px 0 24px rgba(0, 0, 0, 0.32);
       }
-      :host([data-appearance="sepia"]) .alc-frame {
-        --alc-frame-panel: #fffaf0;
-        --alc-frame-line: #ded0b8;
-        --alc-frame-shadow: -8px 0 24px rgba(70, 58, 42, 0.15);
+      :host([data-appearance="sepia"]) .pd-frame {
+        --pd-frame-panel: #fffaf0;
+        --pd-frame-line: #ded0b8;
+        --pd-frame-shadow: -8px 0 24px rgba(70, 58, 42, 0.15);
       }
-      .alc-frame.is-open {
+      .pd-frame.is-open {
         display: block;
       }
-      .alc-frame iframe {
+      .pd-frame iframe {
         width: 100%;
         height: 100%;
         border: 0;
         display: block;
         background: transparent;
       }
-      .alc-frame-fallback {
+      .pd-frame-fallback {
         position: absolute;
         inset: 0;
         z-index: 2;
@@ -3269,23 +3269,23 @@
         place-content: center;
         gap: 10px;
         padding: 24px;
-        background: var(--alc-frame-panel);
+        background: var(--pd-frame-panel);
         color: #66707a;
         font: 13px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         text-align: center;
       }
-      .alc-frame.is-loading .alc-frame-fallback,
-      .alc-frame.is-load-error .alc-frame-fallback {
+      .pd-frame.is-loading .pd-frame-fallback,
+      .pd-frame.is-load-error .pd-frame-fallback {
         display: grid;
       }
-      .alc-frame.is-ready .alc-frame-fallback {
+      .pd-frame.is-ready .pd-frame-fallback {
         display: none;
       }
-      .alc-frame-fallback strong {
+      .pd-frame-fallback strong {
         color: #20242a;
         font-size: 15px;
       }
-      .alc-frame-fallback button {
+      .pd-frame-fallback button {
         min-height: 34px;
         justify-self: center;
         border: 1px solid #156f8f;
@@ -3296,33 +3296,33 @@
         padding: 0 12px;
         cursor: pointer;
       }
-      .alc-frame-resize-edge,
-      .alc-frame-resize-corner {
+      .pd-frame-resize-edge,
+      .pd-frame-resize-corner {
         position: absolute;
         z-index: 3;
         display: none;
         pointer-events: auto;
         touch-action: none;
       }
-      .alc-frame.is-open .alc-frame-resize-edge,
-      .alc-frame.is-open.is-floating .alc-frame-resize-corner {
+      .pd-frame.is-open .pd-frame-resize-edge,
+      .pd-frame.is-open.is-floating .pd-frame-resize-corner {
         display: block;
       }
-      .alc-frame-resize-edge {
+      .pd-frame-resize-edge {
         top: 0;
         bottom: 0;
         left: -5px;
         width: 10px;
         cursor: ew-resize;
       }
-      .alc-frame-resize-corner {
+      .pd-frame-resize-corner {
         left: -7px;
         bottom: -7px;
         width: 18px;
         height: 18px;
         cursor: nesw-resize;
       }
-      .alc-frame-resize-corner::after {
+      .pd-frame-resize-corner::after {
         content: "";
         position: absolute;
         left: 5px;
@@ -3333,47 +3333,47 @@
         border-bottom: 2px solid #66707a;
         opacity: 0.72;
       }
-      .alc-frame.is-resizing,
-      .alc-frame.is-dragging {
+      .pd-frame.is-resizing,
+      .pd-frame.is-dragging {
         transition: none;
         user-select: none;
       }
-      .alc-frame-fab.is-hidden {
+      .pd-frame-fab.is-hidden {
         display: none;
       }
       @media (max-width: 640px) {
-        .alc-frame {
-          width: min(100vw, var(--alc-split-width, 460px));
+        .pd-frame {
+          width: min(100vw, var(--pd-split-width, 460px));
         }
       }
     `;
 
     const fabButton = document.createElement("button");
-    fabButton.className = "alc-frame-fab";
+    fabButton.className = "pd-frame-fab";
     fabButton.type = "button";
     fabButton.textContent = "AI";
-    fabButton.title = "arXivMate";
+    fabButton.title = "PaperDock";
 
     const frameShell = document.createElement("section");
-    frameShell.className = "alc-frame";
-    frameShell.setAttribute("aria-label", "arXivMate");
+    frameShell.className = "pd-frame";
+    frameShell.setAttribute("aria-label", "PaperDock");
 
     const frame = document.createElement("iframe");
     frame.allow = "clipboard-read; clipboard-write";
     const frameSrc = `${runtimeUrl("panel.html")}?paper=${encodeURIComponent(JSON.stringify(paperData))}`;
     frameShell.appendChild(frame);
     const frameFallback = document.createElement("div");
-    frameFallback.className = "alc-frame-fallback";
+    frameFallback.className = "pd-frame-fallback";
     frameFallback.innerHTML = `
-      <strong>正在打开 arXivMate</strong>
+      <strong>正在打开 PaperDock</strong>
       <span>如果长时间没有显示，请刷新当前 PDF 页面后再试。</span>
       <button type="button">刷新页面</button>
     `;
     frameShell.appendChild(frameFallback);
     const frameResizeEdge = document.createElement("div");
-    frameResizeEdge.className = "alc-frame-resize-edge";
+    frameResizeEdge.className = "pd-frame-resize-edge";
     const frameResizeCorner = document.createElement("div");
-    frameResizeCorner.className = "alc-frame-resize-corner";
+    frameResizeCorner.className = "pd-frame-resize-corner";
     frameShell.append(frameResizeEdge, frameResizeCorner);
 
     shadowRoot.append(styleNode, fabButton, frameShell);
@@ -3429,7 +3429,7 @@
       frame.contentWindow?.focus();
     };
     const closePanel = () => {
-      document.documentElement.classList.remove("alc-page-split-active");
+      document.documentElement.classList.remove("pd-page-split-active");
       frameShell.classList.remove("is-open");
       fabButton.classList.remove("is-hidden");
       clearTimeout(frameReadyTimer);
@@ -3482,42 +3482,42 @@
     });
     window.addEventListener("message", (event) => {
       if (event.source !== frame.contentWindow) return;
-      if (event.data?.type === "alc-panel-ready") {
+      if (event.data?.type === "pd-panel-ready") {
         markFrameReady();
       }
-      if (event.data?.type === "alc-close-panel") closePanel();
-      if (event.data?.type === "alc-request-layout") postFrameLayout();
-      if (event.data?.type === "alc-toggle-layout") {
+      if (event.data?.type === "pd-close-panel") closePanel();
+      if (event.data?.type === "pd-request-layout") postFrameLayout();
+      if (event.data?.type === "pd-toggle-layout") {
         frameLayout = normalizePanelLayout({
           ...frameLayout,
           mode: frameLayout.mode === "float" ? "dock" : "float"
         });
         applyFrameLayout(true);
       }
-      if (event.data?.type === "alc-restore-layout") {
+      if (event.data?.type === "pd-restore-layout") {
         frameLayout = getDefaultPanelLayout();
         applyFrameLayout(true);
       }
-      if (event.data?.type === "alc-extract-parent-pdf-text") {
+      if (event.data?.type === "pd-extract-parent-pdf-text") {
         handleParentPdfTextRequest(event, frame, paperData);
       }
-      if (event.data?.type === "alc-resize-start") {
+      if (event.data?.type === "pd-resize-start") {
         startFrameGesture("resize", {
           kind: event.data.kind === "corner" ? "corner" : "edge",
           startX: event.data.screenX,
           startY: event.data.screenY
         });
       }
-      if (event.data?.type === "alc-drag-start") {
+      if (event.data?.type === "pd-drag-start") {
         startFrameGesture("drag", {
           startX: event.data.screenX,
           startY: event.data.screenY
         });
       }
-      if (event.data?.type === "alc-resize-move" || event.data?.type === "alc-drag-move") {
+      if (event.data?.type === "pd-resize-move" || event.data?.type === "pd-drag-move") {
         updateFrameGesture(event.data.screenX, event.data.screenY);
       }
-      if (event.data?.type === "alc-resize-end" || event.data?.type === "alc-drag-end") {
+      if (event.data?.type === "pd-resize-end" || event.data?.type === "pd-drag-end") {
         endFrameGesture(event.data.screenX, event.data.screenY);
       }
     });
@@ -3526,14 +3526,14 @@
     function applyFrameLayout(shouldSave) {
       frameLayout = normalizePanelLayout(frameLayout);
       const floating = frameLayout.mode === "float";
-      document.documentElement.style.setProperty("--alc-split-width", `${frameLayout.dockWidth}px`);
-      document.documentElement.classList.toggle("alc-page-split-active", frameShell.classList.contains("is-open") && !floating);
+      document.documentElement.style.setProperty("--pd-split-width", `${frameLayout.dockWidth}px`);
+      document.documentElement.classList.toggle("pd-page-split-active", frameShell.classList.contains("is-open") && !floating);
       frameShell.classList.toggle("is-floating", floating);
-      frameShell.style.setProperty("--alc-split-width", `${frameLayout.dockWidth}px`);
-      frameShell.style.setProperty("--alc-float-width", `${frameLayout.floatWidth}px`);
-      frameShell.style.setProperty("--alc-float-height", `${frameLayout.floatHeight}px`);
-      frameShell.style.setProperty("--alc-float-top", `${frameLayout.floatTop}px`);
-      frameShell.style.setProperty("--alc-float-right", `${frameLayout.floatRight}px`);
+      frameShell.style.setProperty("--pd-split-width", `${frameLayout.dockWidth}px`);
+      frameShell.style.setProperty("--pd-float-width", `${frameLayout.floatWidth}px`);
+      frameShell.style.setProperty("--pd-float-height", `${frameLayout.floatHeight}px`);
+      frameShell.style.setProperty("--pd-float-top", `${frameLayout.floatTop}px`);
+      frameShell.style.setProperty("--pd-float-right", `${frameLayout.floatRight}px`);
       postFrameLayout();
       if (shouldSave) {
         try {
@@ -3547,7 +3547,7 @@
     function postFrameLayout() {
       try {
         frame.contentWindow?.postMessage({
-          type: "alc-panel-layout",
+          type: "pd-panel-layout",
           layout: {
             mode: frameLayout.mode
           }
@@ -3571,7 +3571,7 @@
         frameShell.classList.add("is-load-error");
         const strong = frameFallback.querySelector("strong");
         const span = frameFallback.querySelector("span");
-        if (strong) strong.textContent = "arXivMate 面板没有成功加载";
+        if (strong) strong.textContent = "PaperDock 面板没有成功加载";
         if (span) span.textContent = "通常是扩展刚更新后当前 PDF 页还没刷新。刷新页面后会重新注入最新脚本。";
       }, 3500);
     }
@@ -3657,31 +3657,31 @@
 })();
 
 function installPageSplitStyles() {
-  if (document.getElementById("arxiv-llm-companion-page-style")) return;
+  if (document.getElementById("paperdock-companion-page-style")) return;
   const node = document.createElement("style");
-  node.id = "arxiv-llm-companion-page-style";
+  node.id = "paperdock-companion-page-style";
   node.textContent = `
-    html.alc-page-split-active {
-      margin-right: var(--alc-split-width, 460px) !important;
+    html.pd-page-split-active {
+      margin-right: var(--pd-split-width, 460px) !important;
       transition: margin-right 160ms ease;
     }
-    html.alc-page-split-active body {
-      width: calc(100vw - var(--alc-split-width, 460px)) !important;
+    html.pd-page-split-active body {
+      width: calc(100vw - var(--pd-split-width, 460px)) !important;
       max-width: 100% !important;
       overflow-x: auto !important;
     }
-    html.alc-page-split-active embed[type="application/pdf"],
-    html.alc-page-split-active pdf-viewer {
-      width: calc(100vw - var(--alc-split-width, 460px)) !important;
-      max-width: calc(100vw - var(--alc-split-width, 460px)) !important;
+    html.pd-page-split-active embed[type="application/pdf"],
+    html.pd-page-split-active pdf-viewer {
+      width: calc(100vw - var(--pd-split-width, 460px)) !important;
+      max-width: calc(100vw - var(--pd-split-width, 460px)) !important;
     }
     @media (max-width: 900px) {
-      html.alc-page-split-active {
+      html.pd-page-split-active {
         margin-right: 0 !important;
       }
-      html.alc-page-split-active body,
-      html.alc-page-split-active embed[type="application/pdf"],
-      html.alc-page-split-active pdf-viewer {
+      html.pd-page-split-active body,
+      html.pd-page-split-active embed[type="application/pdf"],
+      html.pd-page-split-active pdf-viewer {
         width: 100vw !important;
         max-width: 100vw !important;
       }
@@ -3745,7 +3745,7 @@ function normalizeAppearance(value) {
 }
 
 function normalizeLanguage(value) {
-  return window.ArxivMateI18n.normalizeLanguage(value);
+  return window.PaperDockI18n.normalizeLanguage(value);
 }
 
 function resolveFrameAppearance(value) {
@@ -3756,10 +3756,10 @@ function resolveFrameAppearance(value) {
 }
 
 function readEmbeddedPanelPaper() {
-  if (window.ArxivMateEmbeddedPanelPaper && typeof window.ArxivMateEmbeddedPanelPaper === "object") {
-    return window.ArxivMateEmbeddedPanelPaper;
+  if (window.PaperDockEmbeddedPanelPaper && typeof window.PaperDockEmbeddedPanelPaper === "object") {
+    return window.PaperDockEmbeddedPanelPaper;
   }
-  if (window.ArxivMateEmbeddedPanelMode) return null;
+  if (window.PaperDockEmbeddedPanelMode) return null;
   if (typeof chrome === "undefined" || !chrome.runtime?.id) return null;
   const panelUrl = runtimeUrl("panel.html");
   if (!panelUrl || !location.href.startsWith(panelUrl)) return null;
@@ -3837,13 +3837,13 @@ function sendRuntimeMessage(payload) {
           extraction.source = "父页面 PDF.js 正文抽取 + 页面元数据";
         }
         frameNode.contentWindow?.postMessage({
-          type: "alc-parent-pdf-text-result",
+          type: "pd-parent-pdf-text-result",
           requestId,
           extraction
         }, "*");
       } catch (error) {
         frameNode.contentWindow?.postMessage({
-          type: "alc-parent-pdf-text-result",
+          type: "pd-parent-pdf-text-result",
           requestId,
           extraction: null,
           error: error.message || String(error)
@@ -3872,14 +3872,14 @@ function isExtensionContextInvalidated(error) {
 }
 
 function modeToUserText(mode, language = "system") {
-  const i18n = window.ArxivMateI18n;
+  const i18n = window.PaperDockI18n;
   if (mode === "deep") return i18n.t(language, "modeDeepPrompt");
   if (mode === "study") return i18n.t(language, "modeStudyPrompt");
   return i18n.t(language, "modeQuickPrompt");
 }
 
 function modeLabel(mode, language = "system") {
-  const i18n = window.ArxivMateI18n;
+  const i18n = window.PaperDockI18n;
   if (mode === "deep") return i18n.t(language, "deep");
   if (mode === "study") return i18n.t(language, "study");
   if (mode === "ask") return i18n.t(language, "ask");
@@ -4428,8 +4428,8 @@ function displayPaperTitle(value) {
 }
 
 function buildPaperMeta(value) {
-  const i18n = window.ArxivMateI18n;
-  const language = document.getElementById("arxiv-llm-companion-root")?.dataset?.language || "system";
+  const i18n = window.PaperDockI18n;
+  const language = document.getElementById("paperdock-companion-root")?.dataset?.language || "system";
   return [
     value?.submittedAt ? i18n.t(language, "submitted", { date: value.submittedAt }) : "",
     value?.paperUpdatedAt ? i18n.t(language, "updated", { date: value.paperUpdatedAt }) : "",
@@ -4461,7 +4461,7 @@ function truncate(value, max) {
 function formatTime(value, language = "system") {
   if (!value) return "";
   try {
-    return new Intl.DateTimeFormat(window.ArxivMateI18n.resolveLanguage(language), {
+    return new Intl.DateTimeFormat(window.PaperDockI18n.resolveLanguage(language), {
       month: "2-digit",
       day: "2-digit",
       hour: "2-digit",
@@ -4477,7 +4477,7 @@ function formatContextUsage(value, language = "system") {
   const windowTokens = Number(value?.contextWindow);
   if (!Number.isFinite(tokens) || tokens <= 0 || !Number.isFinite(windowTokens) || windowTokens <= 0) return "";
   const percent = Math.max(0, Math.min(100, Math.round((tokens / windowTokens) * 100)));
-  const i18n = window.ArxivMateI18n;
+  const i18n = window.PaperDockI18n;
   return i18n.t(language, "contextUsage", {
     tokens: formatTokenCount(tokens),
     window: formatTokenCount(windowTokens),
@@ -4507,8 +4507,8 @@ function escapeRegExp(value) {
 }
 
 function markdownToHtml(markdown) {
-  if (window.ArxivMateMarkdown?.toHtml) {
-    return window.ArxivMateMarkdown.toHtml(markdown, { headingOffset: 2 });
+  if (window.PaperDockMarkdown?.toHtml) {
+    return window.PaperDockMarkdown.toHtml(markdown, { headingOffset: 2 });
   }
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   const html = [];

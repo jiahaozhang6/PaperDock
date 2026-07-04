@@ -111,28 +111,28 @@ body[data-appearance="sepia"] {
   display: none;
 }
 
-.am-update-title {
+.pd-update-title {
   display: block;
   margin-bottom: 4px;
   color: var(--accent-strong);
   font-size: 14px;
 }
 
-.am-update-text {
+.pd-update-text {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
 }
 
-.am-update-actions {
+.pd-update-actions {
   flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.am-update-download,
-.am-update-guide {
+.pd-update-download,
+.pd-update-guide {
   min-height: 34px;
   display: inline-flex;
   align-items: center;
@@ -149,7 +149,7 @@ body[data-appearance="sepia"] {
   cursor: pointer;
 }
 
-.am-update-guide {
+.pd-update-guide {
   background: var(--control);
   color: var(--accent);
 }
@@ -492,7 +492,7 @@ input {
   margin: 10px 0;
 }
 
-.markdown-body .am-section-break {
+.markdown-body .pd-section-break {
   width: 34%;
   max-width: 240px;
   min-width: 92px;
@@ -500,12 +500,12 @@ input {
   opacity: 0.62;
 }
 
-.markdown-body .am-math {
+.markdown-body .pd-math {
   font-size: 1.04em;
   line-height: 1.45;
 }
 
-.markdown-body .am-math-inline {
+.markdown-body .pd-math-inline {
   display: inline-block;
   max-width: 100%;
   overflow-x: auto;
@@ -513,7 +513,7 @@ input {
   vertical-align: -0.2em;
 }
 
-.markdown-body .am-math-display {
+.markdown-body .pd-math-display {
   display: block;
   max-width: 100%;
   overflow-x: auto;
@@ -525,17 +525,17 @@ input {
   background: var(--pre);
 }
 
-.markdown-body .am-math-display .katex-display {
+.markdown-body .pd-math-display .katex-display {
   margin: 0;
   text-align: left;
 }
 
-.markdown-body .am-math-error {
+.markdown-body .pd-math-error {
   color: #b42318;
   white-space: pre-wrap;
 }
 
-.markdown-body .am-math-frac {
+.markdown-body .pd-math-frac {
   display: inline-grid;
   grid-template-rows: auto auto;
   align-items: center;
@@ -544,27 +544,27 @@ input {
   margin: 0 2px;
 }
 
-.markdown-body .am-math-frac span:first-child {
+.markdown-body .pd-math-frac span:first-child {
   border-bottom: 1px solid currentColor;
   padding: 0 3px 1px;
 }
 
-.markdown-body .am-math-frac span:last-child {
+.markdown-body .pd-math-frac span:last-child {
   padding: 1px 3px 0;
 }
 
-.markdown-body .am-math-root {
+.markdown-body .pd-math-root {
   display: inline-flex;
   align-items: stretch;
   vertical-align: middle;
 }
 
-.markdown-body .am-math-root span:last-child {
+.markdown-body .pd-math-root span:last-child {
   border-top: 1px solid currentColor;
   padding: 0 2px;
 }
 
-.markdown-body .am-table-wrap {
+.markdown-body .pd-table-wrap {
   max-width: 100%;
   overflow-x: auto;
   margin: 10px 0;
@@ -589,14 +589,14 @@ input {
   font-weight: 800;
 }
 
-.markdown-body .am-task-checkbox {
+.markdown-body .pd-task-checkbox {
   appearance: auto;
   width: auto;
   margin: 0 6px 0 0;
   vertical-align: middle;
 }
 
-.markdown-body .am-markdown-image {
+.markdown-body .pd-markdown-image {
   max-width: 100%;
   height: auto;
   border-radius: 6px;

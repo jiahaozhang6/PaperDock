@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.22 - 2026-07-04
+
+PaperDock rebrand release.
+
+- Rename the extension, UI, documentation, update links, WebChat bridge names, and native helper identifiers to PaperDock.
+- Replace the extension icon with the new PaperDock icon.
+- Rename release download guidance and generated package names to `PaperDock-vX.Y.Z.zip`.
+- Add a brand contract test to prevent old project-name remnants from returning.
+
 ## 0.1.21 - 2026-07-04
 
 Preferred model and fixed-temperature model release.
@@ -72,7 +81,7 @@ WebChat PDF attachment and thinking display release.
 - Require verified `pdfAttached` WebChat sessions before reusing a chat, so old text-only sessions no longer skip PDF upload.
 - Persist verified WebChat attachment metadata locally, including filename, size, and attachment timestamp, while preserving existing model settings and paper chat history.
 - Fold ChatGPT/DeepSeek thinking or reasoning output into a collapsible thinking block and prevent thinking DOM nodes from being captured as the final answer.
-- Add a Markdown fallback renderer for arXivMate thinking blocks so folded reasoning still works if the full Markdown renderer is unavailable.
+- Add a Markdown fallback renderer for PaperDock thinking blocks so folded reasoning still works if the full Markdown renderer is unavailable.
 
 ## 0.1.14 - 2026-06-30
 

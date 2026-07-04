@@ -3,11 +3,11 @@
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   }
-  root.ArxivMateZotero = api;
+  root.PaperDockZotero = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const ZOTERO_CONNECTOR_API_VERSION = 3;
   const ZOTERO_CONNECTOR_BASE_URL = "http://127.0.0.1:23119/";
-  const ZOTERO_EXTENSION_VERSION = "arXivMate";
+  const ZOTERO_EXTENSION_VERSION = "PaperDock";
   const SOURCE_ITEM_TYPE_RULES = {
     arxiv: { itemType: "preprint" },
     acm: { itemType: "conferencePaper" },
@@ -135,7 +135,7 @@
       clean(paper.subjects) ? `Subjects: ${clean(paper.subjects)}` : "",
       clean(paper.comments) ? `Comments: ${clean(paper.comments)}` : "",
       clean(paper.pdfUrl) ? `PDF: ${clean(paper.pdfUrl)}` : "",
-      "Saved with arXivMate"
+      "Saved with PaperDock"
     ].filter(Boolean).join("\n");
     if (extra) item.extra = extra;
 
@@ -158,12 +158,12 @@
     const answer = clean(summary);
     const userNote = clean(noteText);
     const messages = Array.isArray(conversation?.messages) ? conversation.messages : [];
-    const title = clean(paper.title || paper.id || "arXivMate Note");
+    const title = clean(paper.title || paper.id || "PaperDock Note");
     const lines = [
       `<h2>${htmlEscape(title)}</h2>`,
       clean(paper.pageUrl) ? `<p><b>URL:</b> ${htmlEscape(clean(paper.pageUrl))}</p>` : "",
       userNote ? `<h3>User Note</h3><p>${htmlEscape(userNote).replace(/\n/g, "<br>")}</p>` : "",
-      answer ? `<h3>arXivMate</h3><p>${htmlEscape(answer).replace(/\n/g, "<br>")}</p>` : "",
+      answer ? `<h3>PaperDock</h3><p>${htmlEscape(answer).replace(/\n/g, "<br>")}</p>` : "",
       messages.length ? `<p><b>Chat turns:</b> ${messages.length}</p>` : ""
     ];
     return lines.filter(Boolean).join("\n");
