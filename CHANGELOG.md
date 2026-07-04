@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.21 - 2026-07-04
+
+Preferred model and fixed-temperature model release.
+
+- Add a preferred model profile that is used by default across paper/PDF chat pages.
+- Remember the model a user manually selects in any chat page until they switch again.
+- Add a settings action and list badge for setting the preferred model explicitly.
+- Fix GPT-5/o-series compatible requests by forcing `temperature: 1` when the model requires it.
+- Lock the settings temperature control to the model-supported boundary for fixed-temperature models.
+- Add contract tests for preferred model persistence and fixed-temperature request bodies.
+
 ## 0.1.20 - 2026-07-03
 
 Zotero suggestion, model settings, and README cleanup release.

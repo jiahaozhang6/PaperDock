@@ -42,6 +42,7 @@
   let lastKnownModelProfiles = [];
   let selectedProfileId = "";
   let selectedModelLabel = "";
+  let lastAppliedPreferredModelProfileId = "";
   let renderTimer = 0;
   let activeStreamCancel = null;
   let isGenerating = false;
@@ -2336,6 +2337,7 @@
 
   function applySettingsSnapshot(settings, options = {}) {
     currentSettings = mergeSettingsWithKnownProfiles(settings, options);
+    applyPreferredModelSelection();
     reconcileSelectedProfile();
     selectedModelLabel = buildSelectedModelLabel();
     applyLanguage(currentSettings.language);
@@ -2501,12 +2503,45 @@
   function selectChatModelById(nextProfileId) {
     if (!nextProfileId || nextProfileId === selectedProfileId) return;
     selectedProfileId = nextProfileId;
+    persistPreferredModelProfile(nextProfileId);
     selectedModelLabel = buildSelectedModelLabel();
     renderModelSelect();
     const profile = getSelectedProfile();
     setStatus(isWebChatProfile(profile)
       ? webChatLoginReminderText(profile)
       : t("modelSelected", { model: selectedProfileDisplayName() }));
+  }
+
+  async function persistPreferredModelProfile(profileId) {
+    const id = String(profileId || "").trim();
+    if (!id) return;
+    lastAppliedPreferredModelProfileId = id;
+    currentSettings = {
+      ...(currentSettings || {}),
+      preferredModelProfileId: id
+    };
+    try {
+      const saved = await sendMessage({
+        type: "setPreferredModelProfile",
+        profileId: id
+      });
+      if (saved && typeof saved === "object") {
+        currentSettings = mergeSettingsWithKnownProfiles(saved);
+        lastAppliedPreferredModelProfileId = currentSettings.preferredModelProfileId || id;
+      }
+    } catch (error) {
+      setStatus(error.message || String(error), true);
+    }
+  }
+
+  function applyPreferredModelSelection() {
+    const profiles = getRenderableProfiles();
+    const preferred = currentSettings?.preferredModelProfileId || "";
+    if (!preferred || !profiles.some((profile) => profile.id === preferred)) return;
+    if (!selectedProfileId || preferred !== lastAppliedPreferredModelProfileId || !profiles.some((profile) => profile.id === selectedProfileId)) {
+      selectedProfileId = preferred;
+    }
+    lastAppliedPreferredModelProfileId = preferred;
   }
 
   function reconcileSelectedProfile() {
@@ -2516,7 +2551,8 @@
       return;
     }
     if (!profiles.some((profile) => profile.id === selectedProfileId)) {
-      selectedProfileId = profiles[0].id;
+      const preferred = currentSettings?.preferredModelProfileId || "";
+      selectedProfileId = profiles.some((profile) => profile.id === preferred) ? preferred : profiles[0].id;
     }
   }
 

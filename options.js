@@ -86,11 +86,11 @@ const PROVIDER_PRESETS = {
 
 const NUMERIC_FIELD_CONFIG = {
   temperature: {
-    min: 0,
-    max: 2,
+    min: (profile) => getTemperatureBounds(profile).min,
+    max: (profile) => getTemperatureBounds(profile).max,
     step: 0.1,
     rangeStep: 0.1,
-    fallback: 0.2,
+    fallback: (profile) => getTemperatureBounds(profile).fallback,
     decimals: 1
   },
   maxOutputTokens: {
@@ -201,7 +201,7 @@ async function loadSettings() {
   try {
     settings = await sendMessage({ type: "getSettings" });
     profiles = normalizeProfiles(settings.modelProfiles, settings);
-    selectedProfileId = profiles[0]?.id || "";
+    selectedProfileId = getPreferredProfileId() || profiles[0]?.id || "";
     localModelPathsInput.value = normalizeLocalModelConfigPaths(settings.localModelConfigPaths).join("\n");
     form.language.value = normalizeLanguage(settings.language);
     currentLanguage = form.language.value;
@@ -245,6 +245,27 @@ async function saveModelProfilesAfterMutation(message) {
     }, { syncProfiles: true });
     const warning = settings?.storageWarning ? `（同步备份未完成：${settings.storageWarning}；本地设置已保存）` : "";
     setStatus(`${message}${warning}`);
+  } catch (error) {
+    setStatus(error.message || String(error), true);
+  } finally {
+    setFormBusy(false);
+  }
+}
+
+async function setPreferredModelProfile(id = selectedProfileId) {
+  readSelectedProfileFromDom();
+  selectedProfileId = id || selectedProfileId;
+  const profile = profiles.find((item) => item.id === selectedProfileId);
+  if (!profile) return;
+  setStatus(t("saving"));
+  setFormBusy(true);
+  try {
+    settings = await sendMessage({
+      type: "setPreferredModelProfile",
+      profileId: profile.id
+    });
+    setStatus(t("preferredModelSaved", { name: profile.name || profile.model || t("untitledProfile") }));
+    renderProfiles();
   } catch (error) {
     setStatus(error.message || String(error), true);
   } finally {
@@ -296,7 +317,7 @@ async function saveCurrentSettings(patch = {}, { syncProfiles = true } = {}) {
   if (syncProfiles) {
     profiles = normalizeProfiles(settings.modelProfiles, settings);
     if (!profiles.some((profile) => profile.id === selectedProfileId)) {
-      selectedProfileId = profiles[0]?.id || "";
+      selectedProfileId = getPreferredProfileId() || profiles[0]?.id || "";
     }
     renderProfiles();
   }
@@ -930,7 +951,7 @@ function renderProfiles() {
     return;
   }
   if (!profiles.some((profile) => profile.id === selectedProfileId)) {
-    selectedProfileId = profiles[0].id;
+    selectedProfileId = getPreferredProfileId() || profiles[0].id;
   }
 
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) || profiles[0];
@@ -966,14 +987,21 @@ function renderProfiles() {
   renderModelDatalist();
 }
 
+function getPreferredProfileId() {
+  const preferred = String(settings?.preferredModelProfileId || "").trim();
+  return profiles.some((profile) => profile.id === preferred) ? preferred : "";
+}
+
 function renderProfileListItem(profile) {
   const isSelected = profile.id === selectedProfileId;
+  const isPreferred = profile.id === settings?.preferredModelProfileId;
   return `
     <button class="profile-list-item ${isSelected ? "is-selected" : ""}" type="button" data-action="select" data-id="${escapeAttr(profile.id)}">
       <span class="profile-list-title">${escapeHtml(profile.name || profile.model || t("untitledProfile"))}</span>
       <span class="profile-list-meta">${escapeHtml(profile.model || t("modelName"))}</span>
       <span class="profile-list-tags">
         <span>${escapeHtml(providerDisplayName(profile.provider))}</span>
+        ${isPreferred ? `<span>${escapeHtml(t("preferredModel"))}</span>` : ""}
       </span>
     </button>
   `;
@@ -1074,6 +1102,7 @@ function renderProfileEditor(profile) {
       </div>
       <div class="profile-editor-actions">
         <output id="profile-action-status" class="profile-action-status" aria-live="polite"></output>
+        <button type="button" data-action="set-preferred">${escapeHtml(t("setPreferredModel"))}</button>
         <button type="button" class="primary-action" data-action="save-profile">${escapeHtml(t("saveThisModel"))}</button>
         <button type="button" data-action="test-profile">${escapeHtml(t("testModel"))}</button>
         <button type="button" data-action="duplicate">${escapeHtml(t("duplicateProfile"))}</button>
@@ -1323,6 +1352,20 @@ function getNumericConfig(field, profile) {
   };
 }
 
+function getTemperatureBounds(profile) {
+  const fixed = getFixedTemperatureValueForModel(profile?.model);
+  if (fixed !== null) {
+    return { min: fixed, max: fixed, fallback: fixed };
+  }
+  return { min: 0, max: 2, fallback: 0.2 };
+}
+
+function getFixedTemperatureValueForModel(model) {
+  const name = normalizeModelName(model);
+  if (name.startsWith("gpt-5") || /^o\d/.test(name)) return 1;
+  return null;
+}
+
 function resolveNumericOption(value, profile) {
   return typeof value === "function" ? value(profile || {}) : value;
 }
@@ -1423,6 +1466,11 @@ function handleProfileAction(event) {
 
   if (action === "save-profile") {
     saveModelProfile(id);
+    return;
+  }
+
+  if (action === "set-preferred") {
+    setPreferredModelProfile(id);
     return;
   }
 
@@ -1967,7 +2015,7 @@ async function importBackup(event) {
     });
     settings = result.settings;
     profiles = normalizeProfiles(result.modelProfiles, settings);
-    selectedProfileId = profiles[0]?.id || "";
+    selectedProfileId = getPreferredProfileId() || profiles[0]?.id || "";
     form.language.value = normalizeLanguage(settings.language);
     currentLanguage = form.language.value;
     form.appearance.value = normalizeAppearance(settings.appearance);

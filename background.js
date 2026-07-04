@@ -2,7 +2,8 @@ importScripts("zotero-client.js");
 
 const DEFAULT_SETTINGS = {
   language: "system",
-  appearance: "system"
+  appearance: "system",
+  preferredModelProfileId: ""
 };
 
 const DEFAULT_PROFILE_SETTINGS = {
@@ -183,6 +184,8 @@ async function handleMessage(message, sender = {}) {
       return getSettings();
     case "saveSettings":
       return saveSettings(message.settings);
+    case "setPreferredModelProfile":
+      return setPreferredModelProfile(message.profileId);
     case "testModelProfile":
       return testModelProfile(message.profile);
     case "listModelsForProfile":
@@ -644,6 +647,7 @@ async function saveSettings(settings) {
     language: normalizeLanguage(settings?.language),
     appearance: normalizeAppearance(settings?.appearance),
     localModelConfigPaths: normalizeLocalModelConfigPaths(settings?.localModelConfigPaths),
+    preferredModelProfileId: normalizePreferredModelProfileId(settings?.preferredModelProfileId, modelProfiles),
     modelProfiles
   };
 
@@ -651,6 +655,33 @@ async function saveSettings(settings) {
     validateModelProfile(profile);
   }
 
+  const persisted = withSettingsMetadata(next);
+  await chrome.storage.local.set({
+    [SETTINGS_LOCAL_KEY]: persisted,
+    [SETTINGS_MIRROR_KEY]: persisted,
+    [MODEL_PROFILES_LOCAL_KEY]: persisted.modelProfiles
+  });
+  notifyPaperTabsSettingsChanged(next);
+
+  const syncWarning = await mirrorSettingsToSync(persisted);
+  if (syncWarning) {
+    return {
+      ...next,
+      storageWarning: syncWarning
+    };
+  }
+  return next;
+}
+
+async function setPreferredModelProfile(profileId) {
+  const current = await getSettings();
+  const next = normalizeSettings({
+    ...current,
+    preferredModelProfileId: profileId
+  });
+  if (!next.preferredModelProfileId) {
+    throw new Error("没有可用的模型配置。");
+  }
   const persisted = withSettingsMetadata(next);
   await chrome.storage.local.set({
     [SETTINGS_LOCAL_KEY]: persisted,
@@ -2109,8 +2140,9 @@ function buildChatRequestBody(settings, messages, stream) {
     stream,
     ...getProviderRequestExtras(settings)
   };
-  if (!shouldOmitTemperature(settings)) {
-    body.temperature = settings.temperature;
+  const temperature = getRequestTemperature(settings);
+  if (temperature !== null) {
+    body.temperature = temperature;
   }
   return body;
 }
@@ -2159,6 +2191,19 @@ function normalizeAnthropicMaxTokens(value) {
   const parsed = Math.floor(Number(value));
   if (!Number.isFinite(parsed) || parsed < 1) return 1024;
   return Math.min(parsed, 64000);
+}
+
+function getRequestTemperature(settings) {
+  const fixed = getFixedTemperatureValueForModel(settings?.model);
+  if (fixed !== null) return fixed;
+  if (shouldOmitTemperature(settings)) return null;
+  return normalizeTemperature(settings?.temperature);
+}
+
+function getFixedTemperatureValueForModel(model) {
+  const name = normalizeString(model).toLowerCase().split("/").pop() || "";
+  if (name.startsWith("gpt-5") || /^o\d/.test(name)) return 1;
+  return null;
 }
 
 function shouldOmitTemperature(settings) {
@@ -3426,6 +3471,7 @@ function normalizeSettings(settings) {
     language: normalizeLanguage(settings?.language),
     appearance: normalizeAppearance(settings?.appearance),
     localModelConfigPaths: normalizeLocalModelConfigPaths(settings?.localModelConfigPaths),
+    preferredModelProfileId: normalizePreferredModelProfileId(settings?.preferredModelProfileId, modelProfiles),
     modelProfiles
   };
 }
@@ -3437,10 +3483,11 @@ function recoverSettings(...candidates) {
   const primary = normalizedCandidates[0] || createDefaultSettings();
   const profileSource = normalizedCandidates.find((candidate) => candidate.modelProfiles.length);
   if (!profileSource) return primary;
-  return {
+  return normalizeSettings({
     ...primary,
+    preferredModelProfileId: primary.preferredModelProfileId || profileSource.preferredModelProfileId,
     modelProfiles: profileSource.modelProfiles
-  };
+  });
 }
 
 function createProfilesSnapshotSettings(modelProfiles) {
@@ -3510,7 +3557,7 @@ function normalizeModelProfile(profile) {
   const model = normalizeString(profile.model) || preset.model;
   const baseUrl = normalizeString(profile.baseUrl) || preset.baseUrl;
   const name = normalizeString(profile.name) || `${providerLabel(provider)} ${model || "model"}`;
-  const temperature = normalizeTemperature(profile.temperature);
+  const temperature = normalizeTemperatureForModel(profile.temperature, model);
   const maxContextChars = normalizeMaxContextChars(profile.maxContextChars);
 
   return {
@@ -3533,12 +3580,20 @@ function normalizeModelProfile(profile) {
   };
 }
 
+function normalizePreferredModelProfileId(value, modelProfiles = []) {
+  const profiles = Array.isArray(modelProfiles) ? modelProfiles : [];
+  if (!profiles.length) return "";
+  const id = normalizeString(value);
+  if (id && profiles.some((profile) => profile.id === id)) return id;
+  return profiles[0].id || "";
+}
+
 function resolveRequestSettings(settings, profileId) {
   const profiles = Array.isArray(settings?.modelProfiles) ? settings.modelProfiles : [];
   if (!profiles.length) {
     throw new Error("还没有模型配置。请先打开 arXivMate 设置，新建并测试一个模型。");
   }
-  const id = normalizeString(profileId);
+  const id = normalizeString(profileId) || normalizeString(settings?.preferredModelProfileId);
   const profile = profiles.find((item) => item.id === id) || profiles[0];
   validateModelProfile(profile);
   return {
@@ -3578,6 +3633,12 @@ function normalizeTemperature(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_PROFILE_SETTINGS.temperature;
   return Math.min(2, Math.max(0, parsed));
+}
+
+function normalizeTemperatureForModel(value, model) {
+  const fixed = getFixedTemperatureValueForModel(model);
+  if (fixed !== null) return fixed;
+  return normalizeTemperature(value);
 }
 
 function normalizeMaxContextChars(value) {
