@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.23 - 2026-07-06
+
+Paper context parity release.
+
+- Align paper chat context assembly with llm-for-zotero: first paper turn sends full paper context, ordinary follow-up turns use focused retrieved evidence, and cache-capable providers can reuse full paper context.
+- Send paper evidence as a separate `Document Context` system message while keeping user and assistant chat history as separate messages.
+- Improve follow-up retrieval by anchoring the abstract once, enriching retrieval with only the last assistant answer, and excluding references from empirical evidence.
+- Add input-window truncation disclosure so the model tells users when full-paper coverage had to be shortened.
+- Add contract tests for paper context planning, streaming fallback, strict-temperature retries, and Zotero suggestion fallback.
+
 ## 0.1.22 - 2026-07-04
 
 PaperDock rebrand release.

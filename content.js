@@ -838,6 +838,9 @@
         },
         onDelta(text) {
           updatePreviewAssistant(preview, text || t("generatedFallback"));
+        },
+        onStreamFallback() {
+          setStatus("流式连接已断开，正在改用普通请求...");
         }
       });
       currentResult = response.text;
@@ -3076,6 +3079,33 @@
           } catch {}
         }, 800);
       };
+      const fallbackToNonStreamingRequest = (fallbackPayload, resolveFallback, rejectFallback) => {
+        if (settled || cancelled) return;
+        let fallbackCancelled = false;
+        callbacks.onStreamFallback?.();
+        activeStreamCancel = () => {
+          fallbackCancelled = true;
+          cancelled = true;
+          if (!settled) {
+            settled = true;
+            rejectFallback(Object.assign(new Error("generation-aborted"), {
+              name: "AbortError",
+              partialText: latestText
+            }));
+          }
+        };
+        sendMessage(fallbackPayload).then((data) => {
+          if (fallbackCancelled || cancelled) return;
+          settled = true;
+          activeStreamCancel = null;
+          resolveFallback(data);
+        }, (sendError) => {
+          if (fallbackCancelled || cancelled) return;
+          settled = true;
+          activeStreamCancel = null;
+          rejectFallback(sendError);
+        });
+      };
       try {
         if (!isRuntimeAvailable()) throw createExtensionContextError();
         port = chrome.runtime.connect({ name: "pd-stream" });
@@ -3149,7 +3179,11 @@
       port.onDisconnect.addListener(() => {
         if (cancelled) return;
         if (!settled) {
-          reject(Object.assign(new Error(getRuntimeLastErrorMessage() || "流式连接已断开，请重试。"), {
+          if (!latestText) {
+            fallbackToNonStreamingRequest(payload, resolve, reject);
+            return;
+          }
+          reject(Object.assign(new Error(getRuntimeLastErrorMessage() || "流式连接已断开，已保留已生成内容。"), {
             partialText: latestText
           }));
         }

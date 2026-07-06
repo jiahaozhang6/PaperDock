@@ -26,6 +26,12 @@ const MAX_MESSAGES_PER_CONVERSATION = 200;
 const MAX_CONTEXT_CACHE_ENTRIES = 80;
 const PDF_TEXT_MIN_CHARS = 1600;
 const PDF_TEXT_CONTEXT_SOURCE = "PDF 文本抽取（未上传 PDF 文件）+ 页面元数据";
+const PAPER_CONTEXT_RETRIEVAL_MAX_CHUNKS = 5;
+const PAPER_CONTEXT_RETRIEVAL_MIN_CHUNKS = 2;
+const PAPER_CONTEXT_RETRIEVAL_MIN_CHARS = 400;
+const PAPER_CONTEXT_CHUNK_TARGET_CHARS = 1100;
+const PAPER_CONTEXT_CHUNK_MAX_CHARS = 1800;
+const PAPER_CONTEXT_CACHE_MIN_TOKENS = 1024;
 const GITHUB_RELEASES_API_URL = "https://api.github.com/repos/jiahaozhang6/PaperDock/releases";
 const GITHUB_RELEASES_PAGE_URL = "https://github.com/jiahaozhang6/PaperDock/releases";
 const UPDATE_CHECK_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -960,31 +966,46 @@ async function suggestZoteroTargets(paper, targets, profileId = "", selectedTarg
     throw new Error("AI 推荐分类需要使用 API 模型；WebChat 模型不适合在后台静默请求。");
   }
   const prompt = PaperDockZotero.buildSuggestionPrompt(normalizedPaper, normalizedTargets);
-  const text = await callChatCompletions({
-    ...settings,
-    temperature: 0.1,
-    maxOutputTokens: Math.min(settings.maxOutputTokens || 8192, 1200)
-  }, [
-    {
-      role: "system",
-      content: "You recommend Zotero collections. Return strict JSON only."
-    },
-    {
-      role: "user",
-      content: prompt
-    }
-  ]);
+  let text = "";
+  let warning = "";
+  try {
+    text = await callChatCompletions({
+      ...settings,
+      maxOutputTokens: Math.min(settings.maxOutputTokens || 8192, 1200)
+    }, [
+      {
+        role: "system",
+        content: "You recommend Zotero collections. Return strict JSON only."
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ]);
+  } catch (error) {
+    if (!isEmptyModelOutputError(error)) throw error;
+    warning = `${error.message || String(error)} 已使用本地匹配推荐。`;
+  }
   const suggestions = parseZoteroSuggestions(text, normalizedTargets);
+  const fallback = suggestions.length ? [] : PaperDockZotero.createSuggestionFallback(normalizedPaper, normalizedTargets, {
+    selectedTargetId
+  });
+  if (!warning && !suggestions.length && fallback.length) {
+    warning = "模型没有返回可用分类，已使用本地匹配推荐。";
+  }
   return {
-    suggestions: suggestions.length ? suggestions : PaperDockZotero.createSuggestionFallback(normalizedPaper, normalizedTargets, {
-      selectedTargetId
-    }),
-    raw: text
+    suggestions: suggestions.length ? suggestions : fallback,
+    raw: text,
+    warning
   };
 }
 
 function parseZoteroSuggestions(text, targets) {
   return PaperDockZotero.parseSuggestionResponse(text, targets);
+}
+
+function isEmptyModelOutputError(error) {
+  return /LLM 返回为空|model returned empty|empty/i.test(error?.message || String(error || ""));
 }
 
 async function ensureZoteroCookiePermission(origins = []) {
@@ -1379,23 +1400,44 @@ async function prepareSummarizePaper({
   const recentConversationMessages = mode === "ask"
     ? getRecentConversationMessages(conversationForContext?.messages || [], settings)
     : [];
-
-  let messages = buildPrompt({
+  const paperContextPlan = buildPaperContextPlan({
     paper: normalizedPaper,
     mode,
     question: normalizeString(question),
     fullText: paperContext.fullText,
     contextSource: paperContext.contextSource,
+    conversationMessages: recentConversationMessages,
+    contextMode,
+    settings
+  });
+  const plannedPaperContext = {
+    ...paperContext,
+    contextSource: paperContextPlan.contextSource
+  };
+
+  let messages = buildPrompt({
+    paper: normalizedPaper,
+    mode,
+    question: normalizeString(question),
+    paperContextText: paperContextPlan.contextText,
+    contextSource: paperContextPlan.contextSource,
     language: settings.language,
-    conversationMessages: recentConversationMessages
+    conversationMessages: recentConversationMessages,
+    systemMessages: paperContextPlan.systemMessages
   });
   const inputBudget = applyInputBudget(messages, settings);
-  messages = inputBudget.messages;
+  messages = appendSystemMessagesBeforeFinalUser(
+    inputBudget.messages,
+    buildInputCapEffectSystemMessages(paperContextPlan.strategy, inputBudget.effects)
+  );
+  inputBudget.messages = messages;
+  inputBudget.estimatedAfterTokens = estimateMessagesTokens(messages);
 
   return {
     settings,
     normalizedPaper,
-    paperContext,
+    paperContext: plannedPaperContext,
+    paperContextPlan,
     existingConversation,
     webchatSession: reusableWebChatSession,
     webchatPdf,
@@ -1953,6 +1995,8 @@ function buildAttachmentAwareWebChatPrompt(messages, settings, paper = {}, webch
       ? message.content
       : JSON.stringify(message?.content || "");
     if (!normalizeTextBlock(content)) return false;
+    if (/^Document Context:\s*/i.test(content)) return false;
+    if (/^(Full Paper Contexts:|Retrieved Evidence:)/i.test(content)) return false;
     if (/Full text excerpt:/i.test(content)) return false;
     if (/正文已按模型输入预算截断|Full text excerpt/i.test(content)) return false;
     return true;
@@ -1978,6 +2022,8 @@ function buildAttachmentAwareWebChatPrompt(messages, settings, paper = {}, webch
 
 function stripWebChatFullTextBlocks(content) {
   return String(content || "")
+    .replace(/Document Context:\n(?:Full Paper Contexts:|Retrieved Evidence:)[\s\S]*?(?=\n\n\[(?:SYSTEM|USER|ASSISTANT)\]|\n\nPlease answer|$)/gi, "")
+    .replace(/^(?:Full Paper Contexts:|Retrieved Evidence:)[\s\S]*$/i, "")
     .replace(/Full text excerpt:\n[\s\S]*?(?=\n\n[A-Z][A-Za-z ]+:|$)/i, "")
     .replace(/正文节选：[\s\S]*?(?=\n\n|$)/g, "")
     .trim();
@@ -2038,8 +2084,11 @@ async function fetchChatCompletionsPayload(settings, body, retryCount = 0) {
   const payload = await parseResponsePayload(response);
   if (!response.ok) {
     const detail = getResponseErrorDetail(response, payload);
-    if (retryCount < 1 && shouldRetryWithAdaptiveThinking(response.status, detail, body)) {
+    if (retryCount < 2 && shouldRetryWithAdaptiveThinking(response.status, detail, body)) {
       return fetchChatCompletionsPayload(settings, adaptThinkingType(body, "adaptive"), retryCount + 1);
+    }
+    if (retryCount < 2 && shouldRetryWithTemperatureOne(response.status, detail, body)) {
+      return fetchChatCompletionsPayload(settings, forceTemperature(body, 1), retryCount + 1);
     }
     throw new Error(`LLM 请求失败：${detail}`);
   }
@@ -2057,8 +2106,11 @@ async function fetchChatCompletionsStreamResponse(settings, body, signal, retryC
   if (!response.ok) {
     const payload = await parseResponsePayload(response);
     const detail = getResponseErrorDetail(response, payload);
-    if (retryCount < 1 && shouldRetryWithAdaptiveThinking(response.status, detail, body)) {
+    if (retryCount < 2 && shouldRetryWithAdaptiveThinking(response.status, detail, body)) {
       return fetchChatCompletionsStreamResponse(settings, adaptThinkingType(body, "adaptive"), signal, retryCount + 1);
+    }
+    if (retryCount < 2 && shouldRetryWithTemperatureOne(response.status, detail, body)) {
+      return fetchChatCompletionsStreamResponse(settings, forceTemperature(body, 1), signal, retryCount + 1);
     }
     if (isStreamUnsupportedError(response.status, detail)) {
       return {
@@ -2108,6 +2160,20 @@ function adaptThinkingType(body, type) {
       ...body.thinking,
       type
     }
+  };
+}
+
+function shouldRetryWithTemperatureOne(status, detail, body) {
+  if (![400, 422].includes(Number(status))) return false;
+  if (Number(body?.temperature) === 1) return false;
+  const text = normalizeString(detail).toLowerCase();
+  return text.includes("temperature") && text.includes("only 1");
+}
+
+function forceTemperature(body, temperature) {
+  return {
+    ...body,
+    temperature
   };
 }
 
@@ -2379,8 +2445,15 @@ function extractAssistantContent(payload, settings = {}) {
       message?.thinking,
       message?.thought
     ] : []),
+    payload?.choices?.[0]?.delta?.content,
     payload?.choices?.[0]?.text,
     payload?.message?.content,
+    payload?.content,
+    payload?.output_text,
+    payload?.output,
+    payload?.response?.output_text,
+    payload?.response?.output,
+    payload?.data,
     payload?.text,
     payload?.raw
   ]);
@@ -2447,8 +2520,28 @@ function normalizeModelContent(value) {
   }
   if (value && typeof value === "object") {
     return normalizeModelContent(value.text) ||
+      normalizeModelContent(value.value) ||
+      normalizeModelContent(value.output_text) ||
       normalizeModelContent(value.content) ||
-      normalizeModelContent(value.delta);
+      normalizeModelContent(value.delta) ||
+      normalizeModelContent(value.message?.content) ||
+      normalizeModelContent(value.message) ||
+      normalizeModelContent(value.response?.output_text) ||
+      normalizeModelContent(value.response?.output) ||
+      normalizeModelContent(value.response) ||
+      normalizeModelContent(value.result) ||
+      normalizeModelContent(value.answer) ||
+      normalizeModelContent(value.reply) ||
+      normalizeModelContent(value.choices?.[0]?.message?.content) ||
+      normalizeModelContent(value.choices?.[0]?.message) ||
+      normalizeModelContent(value.choices?.[0]?.text) ||
+      normalizeModelContent(value.choices?.[0]?.delta?.content) ||
+      normalizeModelContent(value.choices?.[0]?.delta) ||
+      normalizeModelContent(value.data?.choices?.[0]?.message?.content) ||
+      normalizeModelContent(value.data?.choices?.[0]?.message) ||
+      normalizeModelContent(value.data?.choices?.[0]?.text) ||
+      normalizeModelContent(value.data?.output_text) ||
+      normalizeModelContent(value.data?.output);
   }
   return "";
 }
@@ -2671,6 +2764,7 @@ function applyInputBudget(messages, settings) {
   const softLimit = Math.max(512, Math.floor(cap * INPUT_CAP_SAFETY_RATIO) - outputReserve);
   let working = messages.map((message) => ({ ...message }));
   const estimatedBeforeTokens = estimateMessagesTokens(working);
+  const effects = createInputBudgetEffects();
   if (estimatedBeforeTokens <= softLimit) {
     return {
       messages: working,
@@ -2678,48 +2772,92 @@ function applyInputBudget(messages, settings) {
       limitTokens: cap,
       softLimitTokens: softLimit,
       estimatedBeforeTokens,
-      estimatedAfterTokens: estimatedBeforeTokens
+      estimatedAfterTokens: estimatedBeforeTokens,
+      effects
     };
   }
 
-  working = dropOldHistoryMessages(working, softLimit);
-  working = trimPaperContextMessage(working, softLimit);
-  working = trimLastUserMessage(working, softLimit);
+  working = dropOldHistoryMessages(working, softLimit, effects);
+  working = trimPaperContextMessage(working, softLimit, effects);
+  working = trimLastUserMessage(working, softLimit, effects);
   return {
     messages: working,
     capped: true,
     limitTokens: cap,
     softLimitTokens: softLimit,
     estimatedBeforeTokens,
-    estimatedAfterTokens: estimateMessagesTokens(working)
+    estimatedAfterTokens: estimateMessagesTokens(working),
+    effects
   };
 }
 
-function dropOldHistoryMessages(messages, softLimit) {
+function createInputBudgetEffects() {
+  return {
+    documentContextTrimmed: false,
+    documentContextDropped: false,
+    promptTrimmed: false,
+    historyDropped: false
+  };
+}
+
+function markInputBudgetEffect(effects, key) {
+  if (effects && Object.prototype.hasOwnProperty.call(effects, key)) {
+    effects[key] = true;
+  }
+}
+
+function dropOldHistoryMessages(messages, softLimit, effects = null) {
   const working = [...messages];
   while (estimateMessagesTokens(working) > softLimit && working.length > 3) {
-    const index = working.findIndex((message, i) => i > 1 && i < working.length - 1);
+    const index = working.findIndex((message, i) =>
+      i > 1 &&
+      i < working.length - 1 &&
+      (message.role === "user" || message.role === "assistant")
+    );
     if (index < 0) break;
     working.splice(index, 1);
+    markInputBudgetEffect(effects, "historyDropped");
   }
   return working;
 }
 
-function trimPaperContextMessage(messages, softLimit) {
+function trimPaperContextMessage(messages, softLimit, effects = null) {
   const working = [...messages];
   let index = working.findIndex((message) =>
+    message.role === "system" &&
+    typeof message.content === "string" &&
+    message.content.startsWith("Document Context:\n")
+  );
+  if (index < 0) {
+    index = working.findIndex((message) =>
     message.role === "user" &&
     typeof message.content === "string" &&
     message.content.includes("Full text excerpt:")
-  );
+    );
+  }
   if (index < 0) return working;
   let guard = 0;
   while (estimateMessagesTokens(working) > softLimit && guard < 12) {
     guard += 1;
     const content = working[index].content;
-    const marker = "Full text excerpt:\n";
+    const marker = content.includes("Paper Text:\n") ? "Paper Text:\n" : "Full text excerpt:\n";
     const markerIndex = content.indexOf(marker);
-    if (markerIndex < 0) break;
+    if (markerIndex < 0) {
+      const prefix = content.startsWith("Document Context:\n") ? "Document Context:\n" : "";
+      const body = prefix ? content.slice(prefix.length) : content;
+      const nextChars = Math.floor(body.length * 0.72);
+      if (nextChars < 1200) {
+        working.splice(index, 1);
+        markInputBudgetEffect(effects, "documentContextDropped");
+        break;
+      }
+      working[index] = {
+        ...working[index],
+        content: `${prefix}${body.slice(0, nextChars).trim()}\n\n[文档上下文已按模型输入预算截断]`
+      };
+      markInputBudgetEffect(effects, "documentContextTrimmed");
+      continue;
+    }
     const prefix = content.slice(0, markerIndex + marker.length);
     const body = content.slice(markerIndex + marker.length);
     const nextChars = Math.floor(body.length * 0.72);
@@ -2728,17 +2866,19 @@ function trimPaperContextMessage(messages, softLimit) {
         ...working[index],
         content: content.slice(0, markerIndex).trim()
       };
+      markInputBudgetEffect(effects, "documentContextTrimmed");
       break;
     }
     working[index] = {
       ...working[index],
       content: `${prefix}${body.slice(0, nextChars).trim()}\n\n[正文已按模型输入预算截断]`
     };
+    markInputBudgetEffect(effects, "documentContextTrimmed");
   }
   return working;
 }
 
-function trimLastUserMessage(messages, softLimit) {
+function trimLastUserMessage(messages, softLimit, effects = null) {
   const working = [...messages];
   const index = findLastIndex(working, (message) => message.role === "user");
   if (index < 0) return working;
@@ -2751,8 +2891,28 @@ function trimLastUserMessage(messages, softLimit) {
       ...working[index],
       content: `${content.slice(0, Math.floor(content.length * 0.75)).trim()}\n\n[问题已按模型输入预算截断]`
     };
+    markInputBudgetEffect(effects, "promptTrimmed");
   }
   return working;
+}
+
+function appendSystemMessagesBeforeFinalUser(messages, systemMessages = []) {
+  const additions = (Array.isArray(systemMessages) ? systemMessages : [])
+    .map((message) => normalizeTextBlock(message))
+    .filter(Boolean)
+    .filter((message) => !messages.some((existing) =>
+      existing?.role === "system" &&
+      normalizeTextBlock(existing.content) === message
+    ))
+    .map((content) => ({ role: "system", content }));
+  if (!additions.length) return messages;
+  const index = findLastIndex(messages, (message) => message.role === "user");
+  if (index < 0) return [...messages, ...additions];
+  return [
+    ...messages.slice(0, index),
+    ...additions,
+    ...messages.slice(index)
+  ];
 }
 
 function estimateMessagesTokens(messages) {
@@ -2773,21 +2933,24 @@ function findLastIndex(array, predicate) {
   return -1;
 }
 
-function buildPrompt({ paper, mode, question, fullText, contextSource, language, conversationMessages = [] }) {
+function buildPrompt({
+  paper,
+  mode,
+  question,
+  fullText,
+  paperContextText,
+  contextSource,
+  language,
+  conversationMessages = [],
+  systemMessages = []
+}) {
   const outputLanguage = resolveOutputLanguageInstruction(language);
   const promptLanguage = resolveOutputLanguageCode(language);
-  const paperBlock = [
-    `Title: ${paper.title || "Unknown"}`,
-    `${paper.sourceType === "arxiv" ? "arXiv ID" : "Document ID"}: ${paper.id || "Unknown"}`,
-    `Authors: ${paper.authors || "Unknown"}`,
-    `Submitted: ${paper.submittedAt || "Unknown"}`,
-    `Updated: ${paper.paperUpdatedAt || "Unknown"}`,
-    `Subjects: ${paper.subjects || "Unknown"}`,
-    `Comments: ${paper.comments || "None"}`,
-    `PDF: ${paper.pdfUrl || "Unknown"}`,
-    `Abstract: ${paper.abstract || "No abstract extracted."}`,
-    fullText ? `Full text excerpt:\n${fullText}` : ""
-  ].filter(Boolean).join("\n\n");
+  const contextText = normalizeTextBlock(paperContextText) || buildFullPaperContextText({
+    paper,
+    fullText,
+    contextSource
+  });
 
   const modeInstruction = getModeInstruction(mode, question, promptLanguage);
   const messages = [
@@ -2801,21 +2964,32 @@ function buildPrompt({ paper, mode, question, fullText, contextSource, language,
         "Prefer structured Markdown with concise bullets and concrete learning actions.",
         "Write every variable, equation, loss, probability expression, and tensor notation as LaTeX math using $...$ for inline math or $$...$$ for display math. Do not leave raw identifiers such as h_v, x_t, or q(x_t|x_0) outside math delimiters."
       ].join(" ")
-    },
-    {
-      role: "user",
-      content: [
-        `${promptLanguage === "zh-CN" ? "上下文来源" : "Context source"}: ${contextSource}.`,
-        promptLanguage === "zh-CN" ? "论文上下文：" : "Paper context:",
-        paperBlock
-      ].join("\n")
     }
   ];
 
-  for (const message of conversationMessages) {
+  if (contextText) {
     messages.push({
-      role: message.role,
-      content: message.text
+      role: "system",
+      content: `Document Context:\n${contextText}`
+    });
+  }
+
+  for (const systemMessage of Array.isArray(systemMessages) ? systemMessages : []) {
+    const content = normalizeTextBlock(systemMessage);
+    if (!content) continue;
+    messages.push({
+      role: "system",
+      content
+    });
+  }
+
+  for (const message of conversationMessages) {
+    const role = message?.role === "assistant" ? "assistant" : "user";
+    const content = normalizeTextBlock(message?.text || message?.content);
+    if (!content) continue;
+    messages.push({
+      role,
+      content
     });
   }
 
@@ -2825,6 +2999,564 @@ function buildPrompt({ paper, mode, question, fullText, contextSource, language,
   });
 
   return messages;
+}
+
+function selectPaperContextAssemblyMode({ fullContextText = "", fullContextTokens = null, settings = {} } = {}) {
+  const text = normalizeTextBlock(fullContextText);
+  if (!text) return "retrieval";
+  const tokens = Number.isFinite(Number(fullContextTokens))
+    ? Number(fullContextTokens)
+    : estimateTextTokens(text);
+  return tokens <= resolvePaperContextBudgetTokens(settings) ? "full" : "retrieval";
+}
+
+function resolvePaperContextBudgetTokens(settings = {}) {
+  const cap = normalizeInputTokenCap(settings?.inputTokenCap, settings?.model);
+  const outputReserve = normalizeMaxOutputTokens(settings?.maxOutputTokens, settings?.model);
+  return Math.max(512, Math.floor(cap * INPUT_CAP_SAFETY_RATIO) - outputReserve - 768);
+}
+
+function shouldPreferCacheAwareFullContext({
+  settings = {},
+  candidateContextText = "",
+  candidateContextTokens = null
+} = {}) {
+  const tokens = Number.isFinite(Number(candidateContextTokens))
+    ? Number(candidateContextTokens)
+    : estimateTextTokens(candidateContextText);
+  if (tokens < PAPER_CONTEXT_CACHE_MIN_TOKENS) return false;
+  const capability = resolvePromptCacheCapability(settings);
+  return capability.stablePrefix;
+}
+
+function buildPaperContextCachePlan({ settings = {}, contextText = "", contextTokens = null } = {}) {
+  const capability = resolvePromptCacheCapability(settings);
+  const tokens = Number.isFinite(Number(contextTokens))
+    ? Number(contextTokens)
+    : estimateTextTokens(contextText);
+  return {
+    enabled: capability.stablePrefix && tokens >= PAPER_CONTEXT_CACHE_MIN_TOKENS,
+    mode: capability.kind === "explicit_blocks" ? "anthropic_block" : "stable_prefix",
+    provider: capability.provider,
+    providerLabel: capability.label,
+    contextTokens: tokens,
+    statusLabel: capability.label
+  };
+}
+
+function resolvePromptCacheCapability(settings = {}) {
+  const provider = normalizeProvider(settings?.provider);
+  const inferredProvider = provider === "custom"
+    ? inferProviderFromBaseUrl(settings?.baseUrl)
+    : provider;
+  const baseUrl = normalizeString(settings?.baseUrl).toLowerCase();
+  const model = normalizeString(settings?.model).toLowerCase().split("/").pop() || "";
+
+  if (isWebChatProvider(inferredProvider)) {
+    return {
+      kind: "none",
+      provider: "unknown",
+      label: "No prompt cache support",
+      stablePrefix: false
+    };
+  }
+  if (inferredProvider === "openai") {
+    return {
+      kind: "automatic_prefix",
+      provider: "openai",
+      label: "OpenAI prompt cache",
+      stablePrefix: true
+    };
+  }
+  if (inferredProvider === "deepseek") {
+    return {
+      kind: "automatic_prefix",
+      provider: "deepseek",
+      label: "DeepSeek KV cache",
+      stablePrefix: true
+    };
+  }
+  if (inferredProvider === "anthropic") {
+    return {
+      kind: "explicit_blocks",
+      provider: "anthropic",
+      label: "Anthropic prompt cache",
+      stablePrefix: true
+    };
+  }
+  if (inferredProvider === "minimax" && /anthropic|claude/.test(baseUrl)) {
+    return {
+      kind: "explicit_blocks",
+      provider: "minimax",
+      label: "MiniMax prompt cache",
+      stablePrefix: true
+    };
+  }
+  if (/gemini/.test(baseUrl) || /^gemini/.test(model)) {
+    return {
+      kind: "automatic_prefix",
+      provider: "gemini",
+      label: "Gemini context cache",
+      stablePrefix: true
+    };
+  }
+  if (/kimi|moonshot/.test(baseUrl) || /^kimi/.test(model)) {
+    return {
+      kind: "automatic_prefix",
+      provider: "kimi",
+      label: "Kimi context cache",
+      stablePrefix: true
+    };
+  }
+  return {
+    kind: "none",
+    provider: "unknown",
+    label: "No prompt cache support",
+    stablePrefix: false
+  };
+}
+
+function buildPaperContextPlan({
+  paper,
+  mode,
+  question,
+  fullText,
+  contextSource,
+  conversationMessages = [],
+  settings = {}
+} = {}) {
+  const cleanFullText = normalizeTextBlock(fullText);
+  const fullContextText = buildFullPaperContextText({ paper, fullText: cleanFullText, contextSource });
+  const hasPriorConversation = hasUsableConversationHistory(conversationMessages);
+  const shouldUseFollowupRetrieval =
+    mode === "ask" &&
+    hasPriorConversation &&
+    cleanFullText.length > PAPER_CONTEXT_RETRIEVAL_MIN_CHARS;
+
+  if (shouldUseFollowupRetrieval) {
+    const fullContextTokens = estimateTextTokens(fullContextText);
+    if (
+      selectPaperContextAssemblyMode({
+        fullContextText,
+        fullContextTokens,
+        settings
+      }) === "full" &&
+      shouldPreferCacheAwareFullContext({
+        settings,
+        candidateContextText: fullContextText,
+        candidateContextTokens: fullContextTokens
+      })
+    ) {
+      const contextCache = buildPaperContextCachePlan({
+        settings,
+        contextText: fullContextText,
+        contextTokens: fullContextTokens
+      });
+      return {
+        mode: "full",
+        strategy: "paper-cache-full",
+        contextText: fullContextText,
+        contextSource: appendContextSourceLabel(contextSource, "缓存友好全文上下文"),
+        systemMessages: [],
+        selectedChunkCount: 0,
+        contextCache
+      };
+    }
+
+    const enrichedQuestion = buildEnrichedPaperRetrievalQuery(question, conversationMessages);
+    const retrieved = buildRetrievedPaperContext({
+      paper,
+      fullText: cleanFullText,
+      question: enrichedQuestion,
+      contextSource
+    });
+    if (retrieved.contextText) {
+      return {
+        mode: "retrieval",
+        strategy: "paper-followup-retrieval",
+        contextText: retrieved.contextText,
+        contextSource: appendContextSourceLabel(contextSource, "追问检索片段"),
+        systemMessages: buildPaperContextPlanSystemMessages("paper-followup-retrieval", question),
+        selectedChunkCount: retrieved.selectedChunkCount
+      };
+    }
+  }
+
+  return {
+    mode: "full",
+    strategy: mode === "ask" && hasPriorConversation ? "paper-manual-full" : "paper-first-full",
+    contextText: fullContextText,
+    contextSource: appendContextSourceLabel(contextSource, cleanFullText ? "全文上下文" : "页面元数据"),
+    systemMessages: [],
+    selectedChunkCount: 0
+  };
+}
+
+function hasUsableConversationHistory(messages = []) {
+  return Array.isArray(messages) && messages.some((message) =>
+    ["user", "assistant"].includes(message?.role) &&
+    normalizeTextBlock(message?.text || message?.content)
+  );
+}
+
+function buildPaperContextPlanSystemMessages(strategy, question = "", inputCapEffects = null) {
+  if (question && typeof question === "object") {
+    inputCapEffects = question;
+    question = "";
+  }
+  const messages = [];
+  if (strategy === "paper-followup-retrieval") {
+    messages.push([
+      "Paper chat has access to the paper's full text.",
+      "The retrieved snippets in this request are a focused grounding subset chosen for this answer, not a statement about limited access.",
+      "Never say that you do not have full access to the paper or that you only have the provided snippets.",
+      "If the user asks about access, say that you can access the full paper and that this answer is grounded in the most relevant retrieved chunks."
+    ].join(" "));
+    if (questionNeedsPaperCapabilityReminder(question)) {
+      messages.push([
+        "If the user asks about access or coverage, answer directly that you can access the paper's full text.",
+        "Then say that, for this reply, you are using the abstract plus the most relevant retrieved chunks instead of quoting the entire paper text."
+      ].join(" "));
+    }
+  }
+  messages.push(...buildInputCapEffectSystemMessages(strategy, inputCapEffects));
+  return messages;
+}
+
+function buildInputCapEffectSystemMessages(strategy, effects = null) {
+  if (!["paper-first-full", "paper-cache-full", "paper-manual-full"].includes(strategy)) {
+    return [];
+  }
+  if (!effects || (!effects.documentContextTrimmed && !effects.documentContextDropped)) {
+    return [];
+  }
+  return [[
+    "Before answering, briefly note that the paper text included for this reply had to be truncated to fit the model input limit, so coverage may be incomplete."
+  ].join(" ")];
+}
+
+function questionNeedsPaperCapabilityReminder(question) {
+  const normalized = normalizeString(question).toLowerCase();
+  if (!normalized) return false;
+  return (
+    /\b(?:full text|full paper|whole paper|entire paper|entire article|whole article)\b/.test(normalized) ||
+    /\b(?:do you have access|can you access|can you read|did you read|coverage|scope)\b/.test(normalized) ||
+    /全文|整篇|完整论文|你能读|你读取|上下文|覆盖/.test(normalized)
+  );
+}
+
+function appendContextSourceLabel(source, label) {
+  const cleanSource = normalizeString(source) || "页面元数据";
+  const cleanLabel = normalizeString(label);
+  if (!cleanLabel || cleanSource.includes(cleanLabel)) return cleanSource;
+  return `${cleanSource}；${cleanLabel}`;
+}
+
+function buildFullPaperContextText({ paper = {}, fullText = "", contextSource = "" } = {}) {
+  const cleanFullText = normalizeTextBlock(fullText);
+  const lines = [
+    "Full Paper Contexts:",
+    "",
+    "Paper 1",
+    ...formatPaperContextMetadataLines(paper, contextSource),
+    "",
+    "Paper Text:",
+    cleanFullText || "(No extracted full text is available; use the metadata and abstract above and state the limitation.)"
+  ];
+  return lines.filter((line) => line !== null && line !== undefined).join("\n");
+}
+
+function formatPaperContextMetadataLines(paper = {}, contextSource = "") {
+  const idLabel = paper.sourceType === "arxiv" ? "arXiv ID" : "Document ID";
+  const lines = [
+    `Title: ${normalizeString(paper.title) || "Unknown"}`,
+    `${idLabel}: ${normalizeString(paper.id) || "Unknown"}`,
+    `Authors: ${normalizeString(paper.authors) || "Unknown"}`,
+    `Submitted: ${normalizeString(paper.submittedAt) || "Unknown"}`,
+    `Updated: ${normalizeString(paper.paperUpdatedAt) || "Unknown"}`,
+    `Subjects: ${normalizeString(paper.subjects) || "Unknown"}`,
+    `Comments: ${normalizeString(paper.comments) || "None"}`,
+    `PDF: ${normalizeString(paper.pdfUrl) || "Unknown"}`,
+    `Context source: ${normalizeString(contextSource) || "Unknown"}`
+  ];
+  const abstract = normalizeTextBlock(paper.abstract);
+  lines.push(`Abstract: ${abstract ? truncateTextBlock(abstract, 2400) : "No abstract extracted."}`);
+  return lines;
+}
+
+function buildEnrichedPaperRetrievalQuery(question, conversationMessages = []) {
+  const currentQuestion = normalizeTextBlock(question);
+  const history = Array.isArray(conversationMessages) ? conversationMessages : [];
+  const lastAssistant = [...history].reverse().find((message) => message?.role === "assistant");
+  const assistantContext = normalizeTextBlock(lastAssistant?.text || lastAssistant?.content).slice(0, 280);
+  if (!assistantContext) return currentQuestion;
+  if (!currentQuestion) return `[Prior answer context: ${assistantContext}]`;
+  return `${currentQuestion}\n[Prior answer context: ${assistantContext}]`;
+}
+
+function buildRetrievedPaperContext({ paper = {}, fullText = "", question = "", contextSource = "" } = {}) {
+  const chunks = splitPaperContextChunks(fullText);
+  if (!chunks.length) {
+    return {
+      contextText: "",
+      selectedChunkCount: 0
+    };
+  }
+
+  const queryTokens = tokenizePaperRetrievalText(question);
+  const scored = chunks
+    .map((chunk) => ({
+      ...chunk,
+      score: scorePaperContextChunk(chunk, queryTokens, question)
+    }))
+    .sort((a, b) => b.score - a.score || a.chunkIndex - b.chunkIndex);
+  const selected = [];
+  const seen = new Set();
+  const abstractChunk = scored.find((chunk) => /abstract/i.test(chunk.sectionLabel)) ||
+    scored.find((chunk) => normalizeTextBlock(paper.abstract) && chunk.text.includes(normalizeTextBlock(paper.abstract).slice(0, 80)));
+
+  addSelectedPaperChunk(selected, seen, abstractChunk);
+  for (const chunk of scored) {
+    if (selected.length >= PAPER_CONTEXT_RETRIEVAL_MAX_CHUNKS) break;
+    if (chunk.score <= 0 && selected.length >= PAPER_CONTEXT_RETRIEVAL_MIN_CHUNKS) continue;
+    addSelectedPaperChunk(selected, seen, chunk);
+  }
+  for (const chunk of chunks) {
+    if (selected.length >= PAPER_CONTEXT_RETRIEVAL_MIN_CHUNKS) break;
+    addSelectedPaperChunk(selected, seen, chunk);
+  }
+
+  selected.sort((a, b) => a.chunkIndex - b.chunkIndex);
+  if (!selected.length) {
+    return {
+      contextText: "",
+      selectedChunkCount: 0
+    };
+  }
+
+  const blocks = [
+    [
+      "Retrieved Evidence:",
+      "",
+      "Paper chat has access to the paper's full text.",
+      "The retrieved snippets in this request are a focused grounding subset chosen for this answer, not a statement about limited access.",
+      "The full paper remains available in paper chat.",
+      "For this reply, prioritize these retrieved snippets as the primary evidence pack.",
+      "Do not use snippets from references as empirical evidence.",
+      "If support is weak or indirect, say so instead of overstating the claim."
+    ].join("\n"),
+    [
+      "Paper 1",
+      ...formatPaperContextMetadataLines(paper, contextSource),
+      "",
+      "Evidence:",
+      ...selected.flatMap((chunk, index) => [
+        `Evidence snippet ${index + 1}`,
+        `Section: ${chunk.sectionLabel || "Unlabeled body text"}`,
+        `Context source: ${normalizeString(contextSource) || "Unknown"}`,
+        "Quoted evidence:",
+        formatMarkdownBlockquote(chunk.text),
+        ""
+      ])
+    ].join("\n").trimEnd()
+  ];
+
+  return {
+    contextText: blocks.join("\n\n---\n\n"),
+    selectedChunkCount: selected.length
+  };
+}
+
+function addSelectedPaperChunk(selected, seen, chunk) {
+  if (!chunk || seen.has(chunk.chunkIndex)) return;
+  if (isReferencePaperChunk(chunk)) return;
+  seen.add(chunk.chunkIndex);
+  selected.push(chunk);
+}
+
+function isReferencePaperChunk(chunk) {
+  return normalizeString(chunk?.sectionLabel).toLowerCase() === "references";
+}
+
+function splitPaperContextChunks(fullText) {
+  const text = normalizeTextBlock(fullText);
+  if (!text) return [];
+  const blocks = buildPaperTextBlocks(text);
+  const chunks = [];
+  let sectionLabel = "Body";
+  let buffer = [];
+  let bufferLength = 0;
+
+  const flush = () => {
+    const chunkText = normalizeTextBlock(buffer.join("\n\n"));
+    buffer = [];
+    bufferLength = 0;
+    if (!chunkText) return;
+    for (const piece of splitLongPaperChunk(chunkText)) {
+      chunks.push({
+        chunkIndex: chunks.length,
+        sectionLabel,
+        text: piece
+      });
+    }
+  };
+
+  for (const block of blocks) {
+    if (block.heading) {
+      flush();
+      sectionLabel = block.heading;
+      continue;
+    }
+    const paragraph = block.text;
+    if (bufferLength && bufferLength + paragraph.length > PAPER_CONTEXT_CHUNK_TARGET_CHARS) {
+      flush();
+    }
+    buffer.push(paragraph);
+    bufferLength += paragraph.length;
+  }
+  flush();
+  return chunks;
+}
+
+function buildPaperTextBlocks(text) {
+  const blocks = [];
+  const paragraphs = normalizeTextBlock(text).split(/\n{2,}/).map((part) => normalizeTextBlock(part)).filter(Boolean);
+  for (const paragraph of paragraphs) {
+    const wholeHeading = detectPaperSectionHeading(paragraph);
+    if (wholeHeading) {
+      blocks.push({ heading: wholeHeading });
+      continue;
+    }
+    const lines = paragraph.split("\n").map((line) => normalizeTextBlock(line)).filter(Boolean);
+    if (lines.length <= 1) {
+      blocks.push({ text: paragraph });
+      continue;
+    }
+    let current = [];
+    for (const line of lines) {
+      const heading = detectPaperSectionHeading(line);
+      if (heading) {
+        if (current.length) {
+          blocks.push({ text: normalizeTextBlock(current.join("\n")) });
+          current = [];
+        }
+        blocks.push({ heading });
+      } else {
+        current.push(line);
+      }
+    }
+    if (current.length) blocks.push({ text: normalizeTextBlock(current.join("\n")) });
+  }
+  return blocks.filter((block) => block.heading || block.text);
+}
+
+function splitLongPaperChunk(text) {
+  const cleanText = normalizeTextBlock(text);
+  if (cleanText.length <= PAPER_CONTEXT_CHUNK_MAX_CHARS) return [cleanText];
+  const sentences = cleanText.split(/(?<=[.!?。！？])\s+/).filter(Boolean);
+  const pieces = [];
+  let current = "";
+  for (const sentence of sentences) {
+    if (current && current.length + sentence.length > PAPER_CONTEXT_CHUNK_MAX_CHARS) {
+      pieces.push(current.trim());
+      current = "";
+    }
+    current = current ? `${current} ${sentence}` : sentence;
+  }
+  if (current.trim()) pieces.push(current.trim());
+  if (pieces.length) return pieces;
+  const fallback = [];
+  for (let index = 0; index < cleanText.length; index += PAPER_CONTEXT_CHUNK_MAX_CHARS) {
+    fallback.push(cleanText.slice(index, index + PAPER_CONTEXT_CHUNK_MAX_CHARS).trim());
+  }
+  return fallback.filter(Boolean);
+}
+
+function detectPaperSectionHeading(paragraph) {
+  const text = normalizeString(paragraph);
+  if (!text || text.length > 120 || /[.!?。！？]\s*$/.test(text)) return "";
+  const numbered = text.match(/^\d+(?:\.\d+)*\.?\s+(.{2,90})$/);
+  const label = numbered ? numbered[1] : text;
+  const normalized = label.toLowerCase();
+  const known = [
+    "abstract",
+    "introduction",
+    "related work",
+    "background",
+    "preliminaries",
+    "method",
+    "methods",
+    "approach",
+    "model",
+    "experiments",
+    "experimental setup",
+    "results",
+    "discussion",
+    "limitations",
+    "conclusion",
+    "references"
+  ];
+  if (known.includes(normalized)) return toTitleCaseSection(label);
+  if (numbered && /^[A-Z][A-Za-z0-9 ,:()/-]{2,90}$/.test(label)) return toTitleCaseSection(label);
+  return "";
+}
+
+function toTitleCaseSection(value) {
+  return normalizeString(value)
+    .replace(/\b[a-z]/g, (char) => char.toUpperCase())
+    .replace(/\bAnd\b/g, "and")
+    .replace(/\bOf\b/g, "of")
+    .replace(/\bFor\b/g, "for");
+}
+
+function tokenizePaperRetrievalText(value) {
+  const text = normalizeTextBlock(value).toLowerCase();
+  const raw = text.match(/[a-z0-9][a-z0-9_+-]{1,}|[\u4e00-\u9fff]/g) || [];
+  const cjkChars = raw.filter((token) => /^[\u4e00-\u9fff]$/.test(token));
+  const cjkBigrams = [];
+  for (let index = 0; index < cjkChars.length - 1; index += 1) {
+    cjkBigrams.push(`${cjkChars[index]}${cjkChars[index + 1]}`);
+  }
+  const stop = new Set([
+    "the", "and", "for", "with", "that", "this", "from", "what", "which", "why",
+    "how", "are", "was", "were", "does", "did", "its", "into", "about", "paper",
+    "论文", "这个", "什么", "为什么", "如何"
+  ]);
+  return [...raw, ...cjkBigrams]
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !stop.has(token))
+    .slice(0, 120);
+}
+
+function scorePaperContextChunk(chunk, queryTokens, query) {
+  const text = normalizeTextBlock(chunk?.text).toLowerCase();
+  if (!text) return 0;
+  const section = normalizeString(chunk?.sectionLabel).toLowerCase();
+  if (section === "references") return -100;
+  const chunkTokens = new Set(tokenizePaperRetrievalText(text));
+  let score = section === "abstract" ? 2 : 0;
+  for (const token of queryTokens) {
+    if (chunkTokens.has(token)) score += 3;
+    else if (text.includes(token)) score += 1;
+  }
+  const cleanQuery = normalizeString(query).toLowerCase();
+  const sectionBoosts = [
+    { pattern: /method|approach|model|算法|方法|模型/, section: /method|approach|model/, boost: 5 },
+    { pattern: /experiment|result|ablation|metric|实验|结果|指标|消融/, section: /experiment|result|evaluation/, boost: 5 },
+    { pattern: /limit|failure|risk|局限|不足|失败|风险/, section: /limit|discussion|conclusion/, boost: 4 },
+    { pattern: /abstract|summary|problem|问题|摘要|概括/, section: /abstract|introduction/, boost: 3 }
+  ];
+  for (const item of sectionBoosts) {
+    if (item.pattern.test(cleanQuery) && item.section.test(section)) score += item.boost;
+  }
+  return score;
+}
+
+function formatMarkdownBlockquote(text) {
+  return normalizeTextBlock(text)
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
 }
 
 function getModeInstruction(mode, question, language = "zh-CN") {
