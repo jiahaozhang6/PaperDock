@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const BRIDGE_VERSION = 15;
+  const BRIDGE_VERSION = 18;
   if (window.__arxivMateWebChatBridgeInstalled >= BRIDGE_VERSION) return;
   window.__arxivMateWebChatBridgeInstalled = BRIDGE_VERSION;
 
@@ -197,6 +197,111 @@
         '[class*="ds-file" i]',
         '[class*="ds-attachment" i]'
       ].join(", ")
+    },
+    gemini: {
+      id: "gemini",
+      label: "Gemini",
+      composerSelectors: [
+        'rich-textarea div[contenteditable="true"]',
+        'rich-textarea [contenteditable="true"]',
+        'div[contenteditable="true"][role="textbox"]',
+        'div[contenteditable="true"][aria-label*="prompt" i]',
+        'div[contenteditable="true"][aria-label*="message" i]',
+        'div[contenteditable="true"][aria-label*="输入" i]',
+        'div[contenteditable="true"]',
+        "textarea"
+      ],
+      sendSelectors: [
+        'button[aria-label*="Send" i]',
+        'button[aria-label*="发送" i]',
+        'button[title*="Send" i]',
+        'button[title*="发送" i]',
+        'button[data-testid*="send" i]',
+        'button[class*="send" i]',
+        '[role="button"][aria-label*="Send" i]',
+        '[role="button"][aria-label*="发送" i]'
+      ],
+      stopSelectors: [
+        'button[aria-label*="Stop" i]',
+        'button[aria-label*="Cancel" i]',
+        'button[aria-label*="停止" i]',
+        'button[aria-label*="取消" i]',
+        'button[title*="Stop" i]',
+        'button[title*="Cancel" i]'
+      ],
+      assistantSelectors: [
+        "message-content",
+        ".model-response-text.has-thoughts",
+        ".model-response-text",
+        ".markdown-main-panel",
+        '[class*="model-response" i]',
+        '[class*="response-container" i]'
+      ],
+      thinkingSelectors: [
+        "[class*='thinking' i]",
+        "[class*='reasoning' i]",
+        "[aria-label*='Thought' i]",
+        "[aria-label*='Thinking' i]",
+        "[aria-label*='思考' i]"
+      ],
+      pruneThinkingSelectors: [
+        "[class*='thinking' i]",
+        "[class*='reasoning' i]"
+      ],
+      dropTargetSelectors: [
+        ".xap-uploader-dropzone",
+        '[class*="uploader-dropzone" i]',
+        "rich-textarea",
+        'rich-textarea div[contenteditable="true"]',
+        'div[contenteditable="true"]',
+        "form"
+      ],
+      attachmentButtonSelectors: [
+        'button[aria-label*="Upload" i]',
+        'button[aria-label*="Attach" i]',
+        'button[aria-label*="Add" i]',
+        'button[aria-label*="file" i]',
+        'button[aria-label*="上传" i]',
+        'button[aria-label*="附件" i]',
+        'button[aria-label*="添加" i]',
+        'button[title*="Upload" i]',
+        'button[title*="Attach" i]',
+        'button[title*="Add" i]',
+        'button[class*="upload" i]',
+        'button[class*="attach" i]',
+        'button:has(input[type="file"])',
+        '[role="button"][aria-label*="Upload" i]',
+        '[role="button"][aria-label*="Attach" i]',
+        '[role="button"][aria-label*="添加" i]',
+        '[role="button"]:has(input[type="file"])',
+        "label:has(input[type='file'])"
+      ],
+      fileInputSelectors: [
+        'input[type="file"][name="Filedata"]',
+        'input[type="file"][accept*="pdf" i]',
+        'input[type="file"][accept*="application/pdf" i]',
+        'input[type="file"][accept*=".pdf" i]',
+        'input[type="file"]'
+      ],
+      attachmentPillSelector: [
+        ".attachment-preview-wrapper",
+        ".file-preview-chip",
+        ".file-preview-container",
+        ".gem-attachment",
+        ".gem-attachment-tile",
+        ".gem-attachment-extension-label",
+        ".gem-attachment-text",
+        '[aria-label*="pdf" i]',
+        '[aria-label*=".pdf" i]'
+      ].join(", "),
+      actionBarSelectors: [
+        'button[aria-label*="Copy" i]',
+        'button[aria-label*="Regenerate" i]',
+        'button[aria-label*="Like" i]',
+        'button[aria-label*="Dislike" i]',
+        'button[aria-label*="复制" i]',
+        'button[aria-label*="重新生成" i]'
+      ]
     }
   };
 
@@ -309,6 +414,7 @@
     const host = location.hostname.toLowerCase();
     if (host.includes("chat.deepseek.com")) return SITE_CONFIGS.deepseek;
     if (host.includes("chatgpt.com")) return SITE_CONFIGS.chatgpt;
+    if (host.includes("gemini.google.com")) return SITE_CONFIGS.gemini;
     return null;
   }
 
@@ -321,6 +427,10 @@
     if (site?.id === "deepseek") {
       const match = location.pathname.match(/^\/a\/chat\/s\/([^/?#]+)/);
       if (match) return `${location.origin}/a/chat/s/${match[1]}`;
+    }
+    if (site?.id === "gemini") {
+      const match = location.pathname.match(/^\/app\/([^/?#]+)/);
+      if (match) return `${location.origin}/app/${match[1]}`;
     }
     return "";
   }
@@ -431,6 +541,24 @@
 
   function chooseComposerCandidate(candidates, site = currentSite()) {
     if (!candidates.length) return null;
+    if (site?.id === "gemini") {
+      return candidates
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          const label = [
+            node.getAttribute("aria-label"),
+            node.getAttribute("placeholder"),
+            node.getAttribute("role"),
+            node.getAttribute("class")
+          ].join(" ");
+          let score = rect.bottom;
+          if (/prompt|message|ask|输入|消息/i.test(label)) score += 1000;
+          if (node.closest?.("rich-textarea")) score += 900;
+          if (rect.width > 260 && rect.height > 20) score += 250;
+          return { node, score };
+        })
+        .sort((left, right) => right.score - left.score)[0]?.node || candidates[candidates.length - 1];
+    }
     if (site?.id !== "deepseek") return candidates[candidates.length - 1];
     return candidates
       .map((node) => {
@@ -525,6 +653,10 @@
       if (/upload-photos|upload-camera|camera|photo|image/.test(identity)) score -= 5000;
     }
     if (site?.id === "deepseek" && /upload|attach|file|pdf|附件|上传|文件/.test(identity)) score += 600;
+    if (site?.id === "gemini") {
+      if (/upload|attach|file|pdf|picker|drive|附件|上传|文件|添加/.test(identity)) score += 700;
+      if (/image|photo|camera|video/.test(identity) && !/pdf|file/.test(identity)) score -= 1200;
+    }
     return score;
   }
 
@@ -816,7 +948,7 @@
     if (networkHookActive && mainWorldInjected) return true;
     const ok = await requestMainWorldHealth();
     if (ok) return true;
-    throw new Error("WebChat MAIN-world 网络桥接未就绪，无法确认 DeepSeek/ChatGPT 是否真的发送。请在 chrome://extensions 重新加载 PaperDock，并刷新 WebChat 页面后重试。");
+    throw new Error("WebChat MAIN-world 网络桥接未就绪，无法确认 ChatGPT/DeepSeek/Gemini 是否真的发送。请在 chrome://extensions 重新加载 PaperDock，并刷新 WebChat 页面后重试。");
   }
 
   function findObservedRequestContext(baselineSerial, prompt = "") {
@@ -982,7 +1114,7 @@
       : "未找到输入框";
     const sendButton = currentSite()?.id === "deepseek" ? findDeepSeekSendButton(composer) : null;
     const sendState = sendButton ? `，发送按钮状态：${describeControl(sendButton)}` : "";
-    throw new Error(`WebChat 输入框没有接收 prompt 或网页未启用发送按钮（${detail}，当前内容：${actual || "空"}${sendState}）。请刷新 DeepSeek/ChatGPT 页面后重试。`);
+    throw new Error(`WebChat 输入框没有接收 prompt 或网页未启用发送按钮（${detail}，当前内容：${actual || "空"}${sendState}）。请刷新 ${currentSite()?.label || "WebChat"} 页面后重试。`);
   }
 
   async function attachPdf(site, pdfBase64, filename) {
@@ -997,7 +1129,7 @@
     let selectedInputDiagnostic = null;
 
     await openAttachmentPicker(site);
-    const pickerInput = await waitForAttachmentFileInput(site, site?.id === "chatgpt" ? 5000 : 2500);
+    const pickerInput = await waitForAttachmentFileInput(site, site?.id === "chatgpt" || site?.id === "gemini" ? 5000 : 2500);
     if (pickerInput) {
       selectedInputDiagnostic = describeFileInput(pickerInput);
       applyFilesToInput(pickerInput, transfer.files);
@@ -1162,8 +1294,10 @@
     return hits >= Math.min(2, parts.length);
   }
 
-  function attachmentIsReady(state, expectedFilename = "") {
-    return expectedFilename ? Boolean(state?.hasExpectedFile) : Number(state?.count || 0) > 0;
+  function attachmentIsReady(site, state, expectedFilename = "") {
+    if (expectedFilename && state?.hasExpectedFile) return true;
+    if (site?.id === "gemini" && state?.hasPdf && Number(state?.count || 0) > 0) return true;
+    return expectedFilename ? false : Number(state?.count || 0) > 0;
   }
 
   async function waitForAttachmentAccepted(site, baseline, timeoutMs, expectedFilename = "") {
@@ -1172,6 +1306,7 @@
       const state = getAttachmentState(site, expectedFilename);
       const baselineCount = typeof baseline === "object" ? Number(baseline.count) || 0 : Number(baseline) || 0;
       if (state.hasExpectedFile) return true;
+      if (attachmentIsReady(site, state, expectedFilename) && (state.hasExpectedFile || state.count > baselineCount || baselineCount === 0)) return true;
       if (!expectedFilename && (state.count > baselineCount || (baselineCount === 0 && state.count > 0))) return true;
       if (!expectedFilename && baselineCount > 0 && state.hasPdf && state.count >= baselineCount) return true;
       await sleep(500);
@@ -1195,7 +1330,7 @@
         attachmentState
       });
       if (site?.id === "deepseek") {
-        if (!uploadBusy && composer && attachmentIsReady(attachmentState, expectedFilename) && sendButton && !isSendButtonVisuallyDisabled(sendButton)) {
+        if (!uploadBusy && composer && attachmentIsReady(site, attachmentState, expectedFilename) && sendButton && !isSendButtonVisuallyDisabled(sendButton)) {
           stableSince ||= Date.now();
           if (Date.now() - stableSince >= 1000) return true;
         } else {
@@ -1204,7 +1339,7 @@
         await sleep(500);
         continue;
       }
-      if (!uploadBusy && composer && attachmentIsReady(attachmentState, expectedFilename) && (sendButton || composer.matches("textarea,input,[contenteditable='true']"))) {
+      if (!uploadBusy && composer && attachmentIsReady(site, attachmentState, expectedFilename) && (sendButton || composer.matches("textarea,input,[contenteditable='true']"))) {
         return true;
       }
       await sleep(500);
@@ -1920,6 +2055,28 @@
     if (site?.id === "chatgpt") {
       return document.querySelectorAll('[data-message-author-role="user"]').length;
     }
+    if (site?.id === "gemini") {
+      const selectors = [
+        "user-query",
+        '[data-test-id*="user" i]',
+        '[data-testid*="user" i]',
+        '[class*="user-query" i]',
+        '[class*="query-content" i]',
+        '[class*="user-prompt" i]'
+      ];
+      const seen = new Set();
+      let count = 0;
+      for (const selector of selectors) {
+        for (const node of document.querySelectorAll(selector)) {
+          if (!(node instanceof Element) || seen.has(node) || !isVisible(node)) continue;
+          const text = normalizeText(node.innerText || node.textContent || "");
+          if (!text && !node.querySelector?.('[class*="file" i], [class*="attachment" i]')) continue;
+          seen.add(node);
+          count += 1;
+        }
+      }
+      return count;
+    }
     if (site?.id === "deepseek") {
       return Array.from(document.querySelectorAll("div.ds-message"))
         .filter((node) => {
@@ -1983,8 +2140,9 @@
       const streamObserved = activeStreamCount > baseline.activeStreamCount || Boolean(lastSseAt && lastSseAt >= baseline.startedAt);
       const userTurnObserved = getUserMessageCount() > baseline.userMessageCount;
       const composerSubmitted = composerLooksSubmitted(prompt, composer);
-      const deepSeek = currentSite()?.id === "deepseek";
-      const delivered = requestObserved || streamObserved || userTurnObserved || (!deepSeek && composerSubmitted);
+      const site = currentSite();
+      const needsStrongSubmitSignal = site?.id === "deepseek" || site?.id === "gemini";
+      const delivered = requestObserved || streamObserved || userTurnObserved || (!needsStrongSubmitSignal && composerSubmitted);
       if (delivered) {
         return {
           delivered: true,
@@ -2315,6 +2473,7 @@
   function getAssistantCandidates(site = currentSite()) {
     if (site?.id === "deepseek") return getDeepSeekAssistantCandidates();
     if (site?.id === "chatgpt") return getChatGptAssistantCandidates(site);
+    if (site?.id === "gemini") return getGeminiAssistantCandidates(site);
     const seen = new Set();
     const candidates = [];
     for (const selector of site?.assistantSelectors || []) {
@@ -2331,6 +2490,56 @@
       }
     }
     return candidates;
+  }
+
+  function getGeminiAssistantCandidates(site = currentSite()) {
+    const candidates = [];
+    const seenKeys = new Set();
+    const seenNodes = new Set();
+    for (const selector of site?.assistantSelectors || []) {
+      for (const node of document.querySelectorAll(selector)) {
+        if (!(node instanceof Element) || !isVisible(node)) continue;
+        if (isGeminiPromptEchoContainer(node)) continue;
+        if (node.closest?.("user-query, [class*='user-query' i], [class*='user-prompt' i]")) continue;
+        const container = node.closest?.("model-response, message-content, [class*='model-response' i], [class*='response-container' i]") || node;
+        if (!(container instanceof Element) || seenNodes.has(container) || !isVisible(container)) continue;
+        if (isGeminiPromptEchoContainer(container)) continue;
+        seenNodes.add(container);
+
+        const sections = extractAssistantSections(container, site);
+        let text = sections.answer || "";
+        let thinking = sections.thinking || "";
+        if (isPaperDockPromptLeak(thinking)) thinking = "";
+        if (!hasMeaningfulText(text)) text = candidateText(container);
+        if (isPaperDockPromptLeak(text) && !hasMeaningfulText(thinking)) continue;
+        if (isPaperDockPromptLeak(text)) text = "";
+        if (isLikelyPaperContextLeak(text) && !hasMeaningfulText(thinking)) continue;
+        if (isLikelyPaperContextLeak(text)) text = "";
+        if (!hasMeaningfulText(text) && !hasMeaningfulText(thinking)) continue;
+
+        const key = `${text}\n---thinking---\n${thinking}`;
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        candidates.push({
+          text,
+          thinking,
+          sourcePriority: geminiAssistantSourcePriority(selector, container),
+          order: candidates.length
+        });
+      }
+    }
+    return candidates;
+  }
+
+  function geminiAssistantSourcePriority(selector, container) {
+    const tag = String(container?.tagName || "").toLowerCase();
+    const className = String(container?.getAttribute?.("class") || container?.className || "").toLowerCase();
+    if (tag === "message-content") return 6;
+    if (/model-response-text/.test(className)) return 5;
+    if (selector === ".markdown-main-panel" || /markdown-main-panel/.test(className)) return 4;
+    if (/model-response/.test(className)) return 2;
+    if (/response-container/.test(className)) return 1;
+    return 0;
   }
 
   function getChatGptAssistantCandidates(site = currentSite()) {
@@ -2774,12 +2983,18 @@
     const baselineCount = Math.max(0, Number(baseline?.count) || 0);
     const afterBaseline = candidates
       .slice(baselineCount)
-      .filter((candidate) => candidate && assistantCandidateSignature(candidate) !== baseline?.signature);
+      .filter((candidate) => candidate && assistantCandidateSignature(candidate) !== baseline?.signature)
+      .filter((candidate) => !isPaperDockPromptLeak(candidate?.text) && !isPaperDockPromptLeak(candidate?.thinking));
     const bestAfterBaseline = chooseBestPostBaselineCandidate(afterBaseline);
     if (bestAfterBaseline) return bestAfterBaseline;
     const latest = candidates[candidates.length - 1] || null;
     if (!latest) return null;
-    if (assistantCandidateSignature(latest) && assistantCandidateSignature(latest) !== baseline?.signature) {
+    if (
+      assistantCandidateSignature(latest) &&
+      assistantCandidateSignature(latest) !== baseline?.signature &&
+      !isPaperDockPromptLeak(latest?.text) &&
+      !isPaperDockPromptLeak(latest?.thinking)
+    ) {
       return latest;
     }
     return null;
@@ -2803,12 +3018,52 @@
   function scoreAssistantCandidate(candidate, index, total) {
     const text = normalizeText(candidate?.text || "");
     const thinking = normalizeText(candidate?.thinking || "");
-    let score = text.length + thinking.length * 0.25 + index * 25;
+    const sourcePriority = Number(candidate?.sourcePriority) || 0;
+    let score = text.length + thinking.length * 0.25 + sourcePriority * 1000 + index * 25;
     if (/^#{1,3}\s|\n#{1,3}\s|\n\d+\.\s|^\d+\.\s|\n[-*]\s|```|\$\$/.test(text)) score += 1200;
     if (/附件定位|核心问题|相关工作|方法|实验|局限|contribution|method|experiment|limitation/i.test(text)) score += 800;
     if (isLikelyChatGptPdfPrelude(text)) score -= 5000;
+    if (isLikelyPaperContextLeak(text)) score -= 20000;
     if (index === total - 1) score += 200;
     return score;
+  }
+
+  function isPaperDockPromptLeak(value) {
+    const text = normalizeText(value);
+    if (!text) return false;
+    if (/You are being used through PaperDock WebChat mode/i.test(text)) return true;
+    const hasProfile = /Current WebChat profile:/i.test(text);
+    const hasSystemBlock = /\[(?:SYSTEM|USER|ASSISTANT)\]/i.test(text);
+    const hasContextBlock = /Document Context:|Full Paper Contexts:|Retrieved Evidence:/i.test(text);
+    const hasPaperMetadata = /(?:arXiv ID|Document ID|Title|PDF):/i.test(text);
+    return (hasProfile && hasSystemBlock) || (hasSystemBlock && hasContextBlock && hasPaperMetadata);
+  }
+
+  function isLikelyPaperContextLeak(value) {
+    const text = normalizeText(value);
+    if (!text) return false;
+    if (isPaperDockPromptLeak(text)) return true;
+    if (/Document Context:|Full Paper Contexts:|Retrieved Evidence:|Context source:|Paper\s+\d+\s*(?:Title|Context|URL):/i.test(text)) return true;
+    const hasAnswerShape = /上下文局限性|一句话概括|研究问题|方法|实验|局限|贡献|总结|answer|summary|key takeaway|limitation/i.test(text);
+    if (hasAnswerShape && /[\u4e00-\u9fa5]{8,}/.test(text)) return false;
+    const hasNumberedPaperSection = /(?:^|\s)\d+(?:\.\d+)*\s+(?:Abstract|Introduction|Related Work|Methodology|Problem Formulation|Approach|Experiments?|Evaluation|Results?|Discussion|Conclusion|References)\b/i.test(text);
+    const hasPaperProse = /\b(?:we|this paper|our|the agent|the model|experiments?)\s+(?:propose|focus|consider|evaluate|train|use|introduce|show|compare|improves?|learns?|discuss)/i.test(text);
+    const hasFormulaOrCitation = /\b[a-z]_[a-z0-9]\b|\b(?:Fig\.|Figure|Table|Section|Appendix)\s+\d|\[[0-9,\s-]{1,20}\]|\([A-Z][A-Za-z]+(?:\s+et\s+al\.)?,?\s+\d{4}\)/.test(text);
+    const mostlyEnglish = !/[\u4e00-\u9fa5]{8,}/.test(text);
+    return text.length > 900 && mostlyEnglish && hasNumberedPaperSection && (hasPaperProse || hasFormulaOrCitation);
+  }
+
+  function isGeminiPromptEchoContainer(node) {
+    if (!(node instanceof Element)) return false;
+    const tag = String(node.tagName || "").toUpperCase();
+    if (/^(CHAT-APP|CHAT-HISTORY|INFINITE-SCROLLER|USER-QUERY|RICH-TEXTAREA)$/.test(tag)) return true;
+    const identity = normalizeText([
+      node.id || "",
+      node.getAttribute?.("class") || "",
+      node.getAttribute?.("data-test-id") || "",
+      node.getAttribute?.("aria-label") || ""
+    ].join(" "));
+    return /\b(chat-history|user-query|user-prompt|input-area|rich-textarea|composer|xap-uploader-dropzone)\b/i.test(identity);
   }
 
   function isLikelyChatGptPdfPrelude(text) {
@@ -2991,7 +3246,7 @@
       pdfFilename = sanitizeFilename(payload.pdfFilename || "paper.pdf");
       pdfSize = Number(payload.pdfSize) || 0;
       pdfAttachmentState = getAttachmentState(site, pdfFilename);
-      pdfAttached = Boolean(pdfAttachmentState?.hasExpectedFile);
+      pdfAttached = attachmentIsReady(site, pdfAttachmentState, pdfFilename);
       if (!pdfAttached) {
         throw new Error(`${site.label} 没有确认收到 PDF 文件附件（${pdfFilename}），已停止发送以避免只发送文字。`);
       }
@@ -3092,12 +3347,14 @@
       const chatGptPreludeOnly = site.id === "chatgpt" && isLikelyChatGptPdfPrelude(lastText);
       const canFinishWithCurrentText = !(site.id === "chatgpt" && chatGptPreludeOnly);
       const chatGptQuietMs = chatGptPdfTurn ? 15000 : 8000;
+      const geminiQuietMs = site.id === "gemini" ? 12000 : 0;
       const deepSeekQuietDone = site.id === "deepseek" && lastText && !activeStreamCount && !uploadBusy && quietFor >= 1500;
       const chatGptActionDone = site.id === "chatgpt" && actionBarVisible && lastText && !chatGptPreludeOnly && !stopVisible && !uploadBusy;
       const chatGptDomQuietDone = site.id === "chatgpt" && lastText && !chatGptPreludeOnly && !stopVisible && !uploadBusy && !activeStreamCount && quietFor >= chatGptQuietMs;
+      const geminiDomQuietDone = site.id === "gemini" && lastText && !stopVisible && !uploadBusy && !activeStreamCount && quietFor >= geminiQuietMs;
       const mayFinishFromDomOnly = !transportObserved && quietFor >= domOnlyQuietMs;
       const mayFinishFromQuietFallback = transportObserved && !activeStreamCount && !sseDone && quietFor >= 90000;
-      if (lastText && canFinishWithCurrentText && !stopVisible && hasWaitedForFirstAnswerMs && (chatGptActionDone || chatGptDomQuietDone || deepSeekQuietDone || sseSettled || mayFinishFromDomOnly || mayFinishFromQuietFallback)) {
+      if (lastText && canFinishWithCurrentText && !stopVisible && hasWaitedForFirstAnswerMs && (chatGptActionDone || chatGptDomQuietDone || geminiDomQuietDone || deepSeekQuietDone || sseSettled || mayFinishFromDomOnly || mayFinishFromQuietFallback)) {
         const chatUrl = await waitForCurrentChatUrl();
         const finalCandidate = getFinalAssistantCandidate(baseline, { text: lastText, thinking: lastThinking || sseThinking });
         postTerminal(port, state, {
@@ -3147,10 +3404,12 @@
   }
 
   function chooseBestAssistantCandidate(streamCandidate = {}, domCandidate = {}) {
-    const stream = normalizeText(streamCandidate?.text || "");
-    const dom = normalizeText(domCandidate?.text || "");
-    const streamThinking = normalizeText(streamCandidate?.thinking || "");
-    const domThinking = normalizeText(domCandidate?.thinking || "");
+    const cleanStreamCandidate = sanitizeAssistantCandidate(streamCandidate);
+    const cleanDomCandidate = sanitizeAssistantCandidate(domCandidate);
+    const stream = cleanStreamCandidate.text;
+    const dom = cleanDomCandidate.text;
+    const streamThinking = cleanStreamCandidate.thinking;
+    const domThinking = cleanDomCandidate.thinking;
     if (hasMeaningfulText(dom) || hasMeaningfulText(domThinking)) {
       return {
         text: hasMeaningfulText(dom) ? dom : "",
@@ -3173,6 +3432,16 @@
       text,
       thinking: domThinking || streamThinking
     };
+  }
+
+  function sanitizeAssistantCandidate(candidate = {}) {
+    let text = normalizeText(candidate?.text || "");
+    let thinking = normalizeText(candidate?.thinking || "");
+    if (isPaperDockPromptLeak(thinking)) thinking = "";
+    if (isPaperDockPromptLeak(text)) text = "";
+    if (isLikelyPaperContextLeak(text)) text = "";
+    if (isLikelyPaperContextLeak(thinking)) thinking = "";
+    return { text, thinking };
   }
 
   function hasBusyComposerHint(site = currentSite()) {

@@ -33,9 +33,9 @@ assert.ok(
   webchat.indexOf("await waitForUploadReady(site") < webchat.indexOf("await ensureChatGptComposerModeForPaperMode("),
   "ChatGPT composer mode should be applied after PDF upload because ChatGPT can reset the picker when an attachment is added"
 );
-assert.match(background, /const WEBCHAT_BRIDGE_VERSION = 15;/, "background WebChat bridge version should force the latest content bridge");
-assert.match(webchat, /const BRIDGE_VERSION = 15;/, "WebChat content bridge should force reload over previous page installs");
-assert.match(injected, /const PATCH_VERSION = 15;/, "MAIN-world WebChat patch should use the same bridge version");
+assert.match(background, /const WEBCHAT_BRIDGE_VERSION = 18;/, "background WebChat bridge version should force the latest content bridge");
+assert.match(webchat, /const BRIDGE_VERSION = 18;/, "WebChat content bridge should force reload over previous page installs");
+assert.match(injected, /const PATCH_VERSION = 18;/, "MAIN-world WebChat patch should use the same bridge version");
 
 const deepThinkMatches = i18n.match(/webchatDeepThink/g) || [];
 assert.ok(deepThinkMatches.length >= 2, "DeepSeek deep thinking status should be localized in zh-CN and en");

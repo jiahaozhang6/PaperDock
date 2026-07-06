@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.24 - 2026-07-06
+
+Gemini WebChat release.
+
+- Add Gemini WebChat as a built-in web model provider.
+- Use text-context mode for Gemini so it can read the current paper without requiring the fragile PDF attachment flow.
+- Fix Gemini answer capture so PaperDock keeps the generated answer instead of showing the submitted prompt or paper context.
+- Restore Markdown structure for compact Gemini numbered summaries, limitations, learning advice, and follow-up questions.
+- Preserve already generated WebChat content when a Gemini stream or page connection disconnects.
+- Add Gemini WebChat contract and stream parser tests.
+
 ## 0.1.23 - 2026-07-06
 
 Paper context parity release.

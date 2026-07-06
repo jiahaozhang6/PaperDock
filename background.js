@@ -49,7 +49,7 @@ const DEFAULT_LOCAL_MODEL_CONFIG_PATHS = [
 ];
 const WEBCHAT_PDF_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 const ZOTERO_PDF_ATTACHMENT_MAX_BYTES = 80 * 1024 * 1024;
-const WEBCHAT_BRIDGE_VERSION = 15;
+const WEBCHAT_BRIDGE_VERSION = 18;
 const ZOTERO_CONNECTOR_SAVE_ITEMS_ENDPOINT = "connector/saveItems";
 const ZOTERO_CONNECTOR_UPDATE_SESSION_ENDPOINT = "connector/updateSession";
 const ZOTERO_CONNECTOR_SAVE_ATTACHMENT_ENDPOINT = "connector/saveAttachment";
@@ -83,6 +83,10 @@ const PROVIDER_PRESETS = {
     baseUrl: "webchat://deepseek",
     model: "DeepSeek Web"
   },
+  webchatGemini: {
+    baseUrl: "webchat://gemini",
+    model: "Gemini Web"
+  },
   custom: {
     baseUrl: "",
     model: ""
@@ -101,6 +105,12 @@ const WEBCHAT_PROVIDERS = {
     label: "DeepSeek Web",
     homeUrl: "https://chat.deepseek.com/",
     urlPattern: "https://chat.deepseek.com/*"
+  },
+  webchatGemini: {
+    id: "gemini",
+    label: "Gemini Web",
+    homeUrl: "https://gemini.google.com/app",
+    urlPattern: "https://gemini.google.com/*"
   }
 };
 
@@ -1564,7 +1574,7 @@ async function callWebChat(settings, messages, webchatPdf = null, paper = null, 
 
 async function callWebChatStream(settings, messages, webchatPdf, paper, webchatSession, webchatMode, onDelta, signal, onStatus) {
   const webchat = getWebChatConfig(settings.provider);
-  if (!webchatSession?.pdfAttached && !webchatPdf?.base64) {
+  if (webChatRequiresPdfAttachment(settings) && !webchatSession?.pdfAttached && !webchatPdf?.base64) {
     throw new Error(`${webchat.label} 首次分析当前论文必须先准备可上传的 PDF 文件；未检测到已验证的网页附件会话，也没有可上传 PDF。`);
   }
   const prompt = buildWebChatPrompt(messages, settings, { webchatPdf, paper, webchatSession });
@@ -1720,7 +1730,7 @@ async function callWebChatStream(settings, messages, webchatPdf, paper, webchatS
 
 function formatWebChatFinalText(answer, thinking, settings) {
   const split = splitWebChatThinkingFromAnswer(answer, thinking);
-  const cleanAnswer = normalizeTextBlock(split.answer);
+  const cleanAnswer = formatCompactWebChatAnswer(split.answer, settings);
   const cleanThinking = normalizeTextBlock(split.thinking);
   if (/:::paperdock-thinking\b/.test(cleanAnswer)) return cleanAnswer;
   if (!cleanThinking || normalizeThinkingMode(settings?.thinkingMode) === "disabled") {
@@ -1733,6 +1743,84 @@ function formatWebChatFinalText(answer, thinking, settings) {
     "",
     cleanAnswer
   ].join("\n");
+}
+
+function formatCompactWebChatAnswer(answer, settings = {}) {
+  let text = normalizeTextBlock(answer);
+  if (!text) return "";
+  if (/^#{1,4}\s/m.test(text) || /\n\s*(?:[-*]|\d+[.)])\s/.test(text)) return text;
+  const provider = normalizeProvider(settings?.provider);
+  if (provider && provider !== "webchatGemini") return text;
+  if (!/[\u4e00-\u9fa5]/.test(text)) return text;
+  if (!/\d+[.．]\s*(?:一句话概括|研究问题|方法|结果|结论|贡献|局限|不足|未来方向|今日学习建议|学习建议|(?:\d+\s*个)?追问问题)/.test(text)) return text;
+
+  text = text.replace(/(?!^)(?=\d+[.．]\s*(?:一句话概括|研究问题|方法|结果|结论|贡献|局限|不足|未来方向|今日学习建议|学习建议|(?:\d+\s*个)?追问问题))/g, "\n\n");
+  const formatted = text.split(/\n{2,}/)
+    .map((line) => formatCompactWebChatLine(line.trim()))
+    .filter(Boolean)
+    .join("\n\n");
+
+  return normalizeTextBlock(formatted
+    .replace(/([。！？])\s*(?=(?:核心痛点|主要矛盾|研究目标|原理|算法|反馈机制|结构化比较|预测精度|负面影响|局限|贡献|哪些结论需要谨慎看|文献上下文局限(?:（[^）]{1,40}）)?|缺乏量化实证评测|仍需判断该论文是否值得深读|建议我重点读哪|重点[一二三四五六七八九十]|(?:\d+\s*个)?追问问题)[：:？?])/g, "$1\n\n- ")
+    .replace(/([：:])\s*(?=(?:情景记忆|语义记忆|选择性预见)[（(])/g, "$1\n\n- "));
+}
+
+function formatCompactWebChatLine(line) {
+  if (!line) return "";
+  let match = line.match(/^(\d+[.．]\s*一句话概括)([\s\S]+)$/);
+  if (match) return `## ${match[1].trim()}\n\n${match[2].trim()}`;
+
+  match = line.match(/^(\d+[.．]\s*局限)([\s\S]+)$/);
+  if (match) return formatWebChatHeadingWithLeadQuestion(match[1], match[2], /^(哪些结论需要谨慎看[？?])([\s\S]*)$/);
+
+  match = line.match(/^(\d+[.．]\s*(?:今日学习建议|学习建议))[：:]?([\s\S]+)$/);
+  if (match) return formatWebChatHeadingWithLeadQuestion(match[1], match[2], /^(建议我重点读哪[^？?]*[？?])([\s\S]*)$/);
+
+  match = line.match(/^(\d+[.．]\s*3\s*个追问问题[^：:]*)([：:]?[\s\S]*)$/);
+  if (match) return `## ${match[1].trim()}${match[2] ? `\n\n${formatWebChatQuestionList(match[2].replace(/^[:：]\s*/, ""))}` : ""}`;
+
+  match = line.match(/^(\d+[.．]\s*(?:研究问题|方法|结果)[：:][^。！？!?：:\n]{1,80}[？?])([\s\S]+)$/);
+  if (match) return `## ${match[1].trim()}\n\n${match[2].trim()}`;
+
+  match = line.match(/^(\d+[.．]\s*(?:贡献|局限|不足|未来方向))[：:]([\s\S]+)$/);
+  if (match) return `## ${match[1].trim()}\n\n${match[2].trim()}`;
+
+  return line;
+}
+
+function formatWebChatHeadingWithLeadQuestion(title, body, questionPattern) {
+  let content = normalizeTextBlock(body).replace(/^[:：]\s*/, "");
+  let heading = title.trim();
+  const question = content.match(questionPattern);
+  if (question) {
+    heading = `${heading}：${question[1].trim()}`;
+    content = question[2].trim();
+  }
+  return `## ${heading}${content ? `\n\n${formatDenseWebChatBullets(content)}` : ""}`;
+}
+
+function formatDenseWebChatBullets(value) {
+  const text = normalizeTextBlock(value).replace(/^[:：]\s*/, "");
+  if (!text) return "";
+  return normalizeTextBlock(text
+    .replace(/(?!^)(?=(?:哪些结论需要谨慎看|文献上下文局限(?:（[^）]{1,40}）)?|缺乏量化实证评测|仍需判断该论文是否值得深读|建议我重点读哪|重点[一二三四五六七八九十]|(?:\d+\s*个)?追问问题)[：:？?])/g, "\n\n")
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.startsWith("- ") ? part : `- ${part}`)
+    .join("\n\n"));
+}
+
+function formatWebChatQuestionList(value) {
+  const text = normalizeTextBlock(value).replace(/^[:：]\s*/, "");
+  if (!text) return "";
+  const parts = text
+    .replace(/(?!^)(?=(?:研究方向关联|研究视角匹配|成果类型期望)[：:])/g, "\n\n")
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!parts.length) return "";
+  return parts.map((part, index) => `${index + 1}. ${part}`).join("\n\n");
 }
 
 function splitWebChatThinkingFromAnswer(answer, thinking = "") {
@@ -1912,7 +2000,7 @@ function delay(ms) {
 }
 
 function buildWebChatPrompt(messages, settings, options = {}) {
-  if (options?.webchatSession?.chatUrl && options.webchatSession.pdfAttached === true) {
+  if (webChatRequiresPdfAttachment(settings) && options?.webchatSession?.chatUrl && options.webchatSession.pdfAttached === true) {
     return buildReusableWebChatPrompt(messages, settings, options.paper, options.webchatSession);
   }
   if (options?.webchatPdf?.base64) {
@@ -4558,6 +4646,7 @@ function providerLabel(provider) {
   if (provider === "openai") return "OpenAI";
   if (provider === "webchatChatGPT") return "ChatGPT Web";
   if (provider === "webchatDeepSeek") return "DeepSeek Web";
+  if (provider === "webchatGemini") return "Gemini Web";
   return "Custom";
 }
 
@@ -4590,6 +4679,7 @@ function inferProviderFromBaseUrl(baseUrl) {
   const normalized = normalizeString(baseUrl).replace(/\/+$/, "").toLowerCase();
   if (normalized === "webchat://chatgpt") return "webchatChatGPT";
   if (normalized === "webchat://deepseek") return "webchatDeepSeek";
+  if (normalized === "webchat://gemini") return "webchatGemini";
   const host = extractProviderHost(normalized);
   if (host.includes("anthropic") || /\/anthropic(?:\/|$)/.test(normalized)) return "anthropic";
   if (host.includes("minimax") || host.includes("minimaxi")) return "minimax";
@@ -4618,6 +4708,10 @@ function isWebChatProvider(provider) {
   return Object.prototype.hasOwnProperty.call(WEBCHAT_PROVIDERS, provider);
 }
 
+function webChatRequiresPdfAttachment(settings) {
+  return isWebChatProvider(settings?.provider) && settings?.provider !== "webchatGemini";
+}
+
 function isAnthropicProvider(settings) {
   return normalizeProvider(settings?.provider) === "anthropic";
 }
@@ -4635,6 +4729,7 @@ function isSupportedWebChatUrl(url, config) {
     if (parsed.origin !== home.origin) return false;
     if (config.id === "chatgpt") return /^\/c\/[^/?#]+/.test(parsed.pathname);
     if (config.id === "deepseek") return /^\/a\/chat\/s\/[^/?#]+/.test(parsed.pathname);
+    if (config.id === "gemini") return /^\/app\/[^/?#]+/.test(parsed.pathname);
     return parsed.href.startsWith(config.homeUrl);
   } catch {
     return false;
@@ -4652,6 +4747,10 @@ function normalizeWebChatChatUrl(url) {
     if (host === "chat.deepseek.com") {
       const match = parsed.pathname.match(/^\/a\/chat\/s\/([^/?#]+)/);
       return match ? `${parsed.origin}/a/chat/s/${match[1]}` : "";
+    }
+    if (host === "gemini.google.com") {
+      const match = parsed.pathname.match(/^\/app\/([^/?#]+)/);
+      return match ? `${parsed.origin}/app/${match[1]}` : "";
     }
   } catch {}
   return "";

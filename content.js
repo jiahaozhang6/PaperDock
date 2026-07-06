@@ -1431,7 +1431,7 @@
   async function buildPaperPayloadForTurn(contextMode) {
     const payload = { ...paper };
     const selectedProfile = getSelectedProfile();
-    if (isWebChatProfile(selectedProfile) && !hasReusableWebChatSession(selectedProfile) && !payload.webchatPdf) {
+    if (webChatRequiresPdfAttachment(selectedProfile) && !hasReusableWebChatSession(selectedProfile) && !payload.webchatPdf) {
       await attachWebChatPdfPayload(payload);
       if (!payload.webchatPdf?.base64) {
         const detail = clean(payload.webchatPdfError || payload.contextSource);
@@ -1762,7 +1762,11 @@
   }
 
   function isWebChatProfile(profile) {
-    return profile?.provider === "webchatChatGPT" || profile?.provider === "webchatDeepSeek";
+    return profile?.provider === "webchatChatGPT" || profile?.provider === "webchatDeepSeek" || profile?.provider === "webchatGemini";
+  }
+
+  function webChatRequiresPdfAttachment(profile) {
+    return isWebChatProfile(profile) && profile?.provider !== "webchatGemini";
   }
 
   function hasReusableWebChatSession(profile) {
@@ -2998,7 +3002,7 @@
   }
 
   function isThinkingWebChatSite(site) {
-    return site === "chatgpt" || site === "deepseek";
+    return site === "chatgpt" || site === "deepseek" || site === "gemini";
   }
 
   function formatWebChatElapsed(elapsedMs) {

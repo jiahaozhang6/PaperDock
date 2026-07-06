@@ -75,6 +75,13 @@ const PROVIDER_PRESETS = {
     baseUrl: "webchat://deepseek",
     model: "DeepSeek Web"
   },
+  webchatGemini: {
+    label: "Gemini Web",
+    labelZh: "Gemini 网页版",
+    labelEn: "Gemini Web",
+    baseUrl: "webchat://gemini",
+    model: "Gemini Web"
+  },
   custom: {
     label: "Custom OpenAI-compatible",
     labelZh: "自定义 OpenAI-compatible",
@@ -2125,11 +2132,11 @@ function inferProvider(baseUrl) {
 }
 
 function isWebChatProvider(provider) {
-  return provider === "webchatChatGPT" || provider === "webchatDeepSeek";
+  return provider === "webchatChatGPT" || provider === "webchatDeepSeek" || provider === "webchatGemini";
 }
 
 function openWebChatPage(provider) {
-  const url = provider === "webchatDeepSeek" ? "https://chat.deepseek.com/" : "https://chatgpt.com/";
+  const url = provider === "webchatGemini" ? "https://gemini.google.com/app" : provider === "webchatDeepSeek" ? "https://chat.deepseek.com/" : "https://chatgpt.com/";
   if (typeof chrome !== "undefined" && chrome.tabs?.create) {
     chrome.tabs.create({ url });
     return;

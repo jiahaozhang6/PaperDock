@@ -1,0 +1,80 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const assert = require("node:assert/strict");
+
+const root = path.resolve(__dirname, "..");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+
+const manifest = read("manifest.json");
+const background = read("background.js");
+const options = read("options.js");
+const content = read("content.js");
+const webchat = read("webchat.js");
+const injected = read("webchat-injected.js");
+const i18n = read("i18n.js");
+
+assert.match(background, /webchatGemini:\s*{[^}]*baseUrl:\s*"webchat:\/\/gemini"[^}]*model:\s*"Gemini Web"/s, "background should define a Gemini WebChat preset");
+assert.match(background, /webchatGemini:\s*{[^}]*id:\s*"gemini"[^}]*homeUrl:\s*"https:\/\/gemini\.google\.com\/app"/s, "background should route Gemini WebChat to gemini.google.com/app");
+assert.match(background, /urlPattern:\s*"https:\/\/gemini\.google\.com\/\*"/, "background should query existing Gemini tabs");
+assert.match(background, /if \(normalized === "webchat:\/\/gemini"\) return "webchatGemini"/, "base URL inference should recover Gemini WebChat profiles");
+assert.match(background, /if \(provider === "webchatGemini"\) return "Gemini Web"/, "Gemini WebChat should have a provider label");
+assert.ok(background.includes('if (config.id === "gemini") return /^\\/app\\/[^/?#]+/.test(parsed.pathname);'), "Gemini saved chat URLs should be reusable");
+
+assert.match(options, /webchatGemini:\s*{[^}]*label:\s*"Gemini Web"[^}]*baseUrl:\s*"webchat:\/\/gemini"/s, "settings should offer Gemini WebChat");
+assert.match(options, /provider === "webchatChatGPT" \|\| provider === "webchatDeepSeek" \|\| provider === "webchatGemini"/, "settings should treat Gemini as WebChat");
+assert.match(options, /provider === "webchatGemini" \? "https:\/\/gemini\.google\.com\/app"/, "settings open-webchat should open Gemini");
+assert.match(i18n, /ChatGPT\/DeepSeek\/Gemini|ChatGPT\/DeepSeek\/Gemini web page/, "WebChat help copy should mention Gemini");
+
+assert.match(content, /profile\?\.provider === "webchatChatGPT" \|\| profile\?\.provider === "webchatDeepSeek" \|\| profile\?\.provider === "webchatGemini"/, "paper panel should treat Gemini as a WebChat profile");
+assert.match(content, /return site === "chatgpt" \|\| site === "deepseek" \|\| site === "gemini"/, "Gemini should use thinking/waiting status");
+assert.match(content, /function webChatRequiresPdfAttachment\(profile\)/, "paper panel should decide PDF attachment requirement per WebChat provider");
+assert.match(content, /profile\?\.provider !== "webchatGemini"/, "Gemini should not require automatic PDF file attachment");
+assert.match(content, /webChatRequiresPdfAttachment\(selectedProfile\)/, "PDF preparation should use the provider-specific requirement");
+assert.match(background, /function webChatRequiresPdfAttachment\(settings\)/, "background should decide PDF attachment requirement per WebChat provider");
+assert.match(background, /settings\?\.provider !== "webchatGemini"/, "Gemini background flow should allow text-context WebChat without PDF attachment");
+assert.match(background, /webChatRequiresPdfAttachment\(settings\)[^]*!webchatPdf\?\.base64/, "WebChat PDF-required guard should not block Gemini text-context mode");
+assert.match(background, /webChatRequiresPdfAttachment\(settings\) && options\?\.webchatSession\?\.chatUrl && options\.webchatSession\.pdfAttached === true/, "Gemini should not reuse stale PDF-attached prompts from earlier false-positive sessions");
+assert.match(background, /port\.onDisconnect\.addListener\(\(\) => \{[^]*?const partialText = formatWebChatFinalText\(latestText,\s*latestThinking,\s*settings\)/, "WebChat disconnects should retain already generated Gemini content");
+assert.match(background, /latestText[\s\S]*?\? `\$\{webchat\.label\} 网页连接已断开，已保留已生成内容。`/, "Gemini WebChat should not turn disconnects after generated text into an empty-result failure");
+assert.match(background, /function formatCompactWebChatAnswer\(/, "background should repair compact numbered WebChat answers before rendering the chat bubble");
+assert.match(background, /formatCompactWebChatAnswer\(split\.answer,\s*settings\)/, "WebChat final text should apply compact-answer formatting regardless of whether the text came from stream or DOM");
+
+assert.match(manifest, /https:\/\/gemini\.google\.com\/\*/, "Gemini pages should receive WebChat content scripts");
+assert.match(webchat, /const BRIDGE_VERSION = 18;/, "WebChat bridge version should bump for Gemini support");
+assert.match(injected, /const PATCH_VERSION = 18;/, "main-world patch version should bump for Gemini support");
+assert.match(webchat, /gemini:\s*{[^}]*id:\s*"gemini"[^}]*label:\s*"Gemini"/s, "WebChat bridge should define Gemini site selectors");
+assert.match(webchat, /dropTargetSelectors:\s*\[[^]*"\.xap-uploader-dropzone"/, "Gemini PDF drops should target the uploader dropzone, not only the composer");
+assert.doesNotMatch(webchat, /gemini:\s*{[^}]*attachmentPillSelector:[^}]*'\[class\*="upload" i\]'/s, "Gemini attachment detection should not count the whole uploader dropzone as a PDF card");
+assert.doesNotMatch(webchat, /gemini:\s*{[^}]*attachmentPillSelector:[^}]*'\[class\*="file" i\]'/s, "Gemini attachment detection should not count the upload-file menu as a PDF card");
+assert.match(webchat, /host\.includes\("gemini\.google\.com"\)\) return SITE_CONFIGS\.gemini/, "WebChat bridge should detect Gemini");
+assert.match(injected, /location\.hostname === "gemini\.google\.com"/, "main-world bridge should detect Gemini");
+assert.ok(injected.includes('/\\/_\\/BardChatUi\\/data\\/assistant\\.lamda\\.BardFrontendService\\/StreamGenerate'), "main-world bridge should observe Gemini conversation requests");
+assert.match(injected, /function parseGeminiStreamText\(/, "main-world bridge should parse Gemini batched RPC stream text");
+assert.match(injected, /function formatGeminiAnswerText\(/, "Gemini stream text should restore compact numbered sections before showing them in PaperDock");
+assert.match(injected, /formatGeminiAnswerText/, "Gemini parser should apply compact-answer Markdown formatting");
+assert.match(injected, /stripGeminiRpcPrefix/, "Gemini parser should handle Google's XSSI RPC prefix");
+assert.match(injected, /parseGeminiStreamText\(buffer, state\)/, "fetch stream handling should feed Gemini chunks to the Gemini parser");
+assert.match(injected, /parseGeminiStreamText\(this\.responseText \|\| "", state\)/, "XHR fallback should parse Gemini responseText");
+assert.match(webchat, /function getGeminiAssistantCandidates\(/, "Gemini responses should be extracted separately");
+assert.match(webchat, /if \(site\?\.id === "gemini"\) return getGeminiAssistantCandidates\(site\)/, "assistant candidate selection should route Gemini");
+assert.match(webchat, /sourcePriority:\s*geminiAssistantSourcePriority\(selector,\s*container\)/, "Gemini DOM extraction should rank exact answer nodes above outer response containers");
+assert.match(webchat, /function geminiAssistantSourcePriority\(selector,\s*container\)/, "Gemini candidate source priority should be explicit and testable");
+assert.match(webchat, /sourcePriority\s*\*\s*1000/, "assistant candidate scoring should respect Gemini source priority");
+assert.match(webchat, /needsStrongSubmitSignal[^=]*=[^;]*site\?\.id === "gemini"/, "Gemini submission should require a real request/user-turn signal, not only a cleared composer");
+assert.doesNotMatch(webchat, /!\s*deepSeek\s*&&\s*composerSubmitted/, "Gemini must not inherit ChatGPT's loose composer-submitted fallback");
+assert.match(webchat, /function isPaperDockPromptLeak\(/, "Gemini capture should recognize PaperDock's internal prompt when the page echoes it");
+assert.match(webchat, /PaperDock WebChat mode/, "prompt-leak detection should include the stable PaperDock WebChat prompt marker");
+assert.match(webchat, /isPaperDockPromptLeak\(text\) && !hasMeaningfulText\(thinking\)/, "Gemini should not treat the submitted prompt as an assistant answer");
+assert.match(webchat, /isPaperDockPromptLeak\(thinking\)/, "Gemini should not show the submitted prompt inside the collapsible thinking block");
+const geminiConfig = webchat.match(/gemini:\s*{[\s\S]*?actionBarSelectors:/)?.[0] || "";
+assert.doesNotMatch(geminiConfig, /\[class\*='thought' i\]/, "Gemini must not prune normal answer wrappers such as model-response-text.has-thoughts");
+assert.doesNotMatch(geminiConfig, /\[class\*="markdown" i\]|"\.markdown"|"\\.prose"/, "Gemini assistant selectors must not scan broad markdown/prose containers that can include the submitted prompt");
+assert.match(webchat, /function isGeminiPromptEchoContainer\(/, "Gemini DOM extraction should reject app/history/user containers that echo the prompt");
+assert.match(webchat, /has-thoughts/, "Gemini response extraction should explicitly tolerate the real has-thoughts answer wrapper");
+assert.match(webchat, /site\.id === "gemini" \? 12000 :/, "Gemini should have a longer quiet settle window than ordinary DOM-only pages");
+assert.match(webchat, /function attachmentIsReady\(site, state, expectedFilename = ""\)/, "attachment readiness should know which WebChat site is being checked");
+assert.match(webchat, /site\?\.id === "gemini"[^]*state\?\.hasPdf[^]*state\?\.count/, "Gemini should accept a PDF attachment card even when the rendered filename is hidden");
+assert.match(webchat, /waitForAttachmentAccepted\(site, baseline, timeoutMs, expectedFilename = ""\)[^]*attachmentIsReady\(site, state, expectedFilename\)/, "Gemini attachment acceptance should use the shared readiness rule");
+assert.match(webchat, /pdfAttached = attachmentIsReady\(site, pdfAttachmentState, pdfFilename\)/, "final PDF-attached state should use the shared readiness rule");
+
+console.log("gemini webchat contract ok");

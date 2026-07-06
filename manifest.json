@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PaperDock",
   "description": "A local-first Chromium extension for reading, chatting with, and reviewing arXiv, ACM, IEEE, and PDF papers using your own LLMs.",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtW3edMVYObyO8rFKezC6zNfl8Q7lD+ycal2MzqPdzZZ8oqnu9qs7GAtRgdIeOZOYHcWfY6tmraTZM+8S/HSci98Fg7Hjkz0QUxFDpY1zDhboOBGL5sutvz3ZRwsXbjulRMvoSSPKnEnIcRs06EBkdYHJ/JXe05bNuwLqBhPS8ZnQJ9GhfCYKZgJ8JZgqx6c0Wmyh61BaDj//FXWytuLtEfcfFxO9j0OLSdfZL/SFurd9CTuP8V8+Ou1A9lvsA6OeluxA/+4GkfbG0mcm8iCuCcDQf85cPLPwkTvm4EfrfigtYFLUFq1BB8Z8DwRc1QrcGKQHM/LZSWa54MUYUdM7qwIDAQAB",
   "icons": {
     "16": "icons/icon-16.png",
@@ -61,7 +61,8 @@
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://gemini.google.com/*"
       ],
       "js": [
         "webchat-injected.js"
@@ -72,7 +73,8 @@
     {
       "matches": [
         "https://chatgpt.com/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://gemini.google.com/*"
       ],
       "js": [
         "webchat.js"
